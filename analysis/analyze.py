@@ -12,6 +12,8 @@ import pathlib
 import pingouin as pg
 import seaborn as sns
 import scipy.stats as stats
+import requests
+import tarfile
 
 from indimap import IndiMap
 from indimap.util import map_func, stat_func
@@ -19,13 +21,34 @@ import util.dataset as dataset
 import util.plotting as plotting
 
 
-def manage_path():
-    """ Create graph path for plots created with this script """
 
+def manage_path():
     current_path = pathlib.Path(__file__).parent.absolute()
     graph_path = current_path / 'graphs'
     graph_path.mkdir(parents=True, exist_ok=True)
-    return graph_path
+    return current_path, graph_path
+
+
+def download_and_extract_data(current_path):
+    OSF_DATA_URL = "https://files.osf.io/v1/resources/n6m7b/providers/osfstorage/6971900f32ee94449d69d5cb"
+    tar_path = current_path / 'midb_data.tar.gz'
+
+    data_path_for_check = [current_path / 'dataset', current_path / 'IndiMap_results']
+    if all([p.exists() for p in data_path_for_check]):
+        return
+
+    print("Downloading data from OSF...")
+    response = requests.get(OSF_DATA_URL, stream=True)
+    with open(tar_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    print("Extracting data...")
+    with tarfile.open(tar_path, 'r:gz') as tar:
+        tar.extractall(path=current_path)
+
+    tar_path.unlink()
+    print("Download and extraction completed.")
 
 
 def init_map():
@@ -64,7 +87,8 @@ def graph(all_data, path):
 
 
 def main():
-    graph_path = manage_path()
+    current_path, graph_path = manage_path()
+    download_and_extract_data(current_path)
     all_maps = init_map()
     compute(all_maps, load=True)
     graph(all_maps, graph_path)
