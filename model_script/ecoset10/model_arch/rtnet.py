@@ -1,18 +1,3 @@
-"""
-This train a bayesian alexnet from scratch and it works decently well
-In 120 epochs, the network could achieve 80% accuracy on validation 
-
-Tricks:
-- KL annealing, this controls the KL divergence term in ELBO loss such that it starts from 0 and gradually increases to 1
-    This helps the model to first learn to fit the data and then gradually learn to regularize.
-    The KL weight is calculated as:
-        float(1 / (1 + np.exp(-0.2 * (self.current_epoch - 15))))
-        which means that at epoch 15, the weight is 0.5, and it approaches 1 as epoch increases.
- - Scale Factor = 0.05 in make_model:
-     This sets the initial standard deviation of the weight priors, 
-     keeping the initial weights close to zero for stable training.
-"""
-
 import numpy as np
 import torch
 import torch.nn.functional as F

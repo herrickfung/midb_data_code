@@ -1,15 +1,5 @@
 """
 ABNN implementation based on "Make Me a BNN: A Simple Strategy for Estimating Bayesian Uncertainty from Pre-trained Models".
-Tricks:
-    - BNLD layer (BatchNorm + LayerNorm + Dropout noise)
-    - Custom ABNN loss (NLL + Negative log prior + Custom CE loss)
-    - Gradual noise annealing and alpha blending
-Problems: 
-     - a fixed set of noise levels for all layers, assuming homeoscedastic uncertainity across layers
-     - Noise is not learnt, but manually annealed
-TDL:
-     - Learnable noise per channel 
-     - Maximize noise level per layer and add an accuracy suffer
 """
 
 import torch
