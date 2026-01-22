@@ -17,8 +17,8 @@ To set up this project locally, follow these steps:
 ### 1. Clone the repository:
 Clone the repository to your local machine and navigate into the project folder:
 ```bash
-git clone https://github.com/herrickfung/midb_data_and_code.git
-cd midb_data_and_code
+git clone https://github.com/herrickfung/midb_data_code.git
+cd midb_data_code
 ```
 
 ### 2. Set up a Python enviornment (optional but recommended)
@@ -35,7 +35,8 @@ source ./venv/bin/activate
 5. matplotlib==3.9.4
 6. pingouin==0.5.5
 7. seaborn==0.13.2
-8. [indimap](https://github.com/herrickfung/IndiMap)==0.0.1
+8. requests==2.32.5
+9. [indimap](https://github.com/herrickfung/IndiMap)==0.1.0
 
 To install these dependencies, 
 ```bash
@@ -49,7 +50,7 @@ pip install git+https://github.com/herrickfung/IndiMap.git
 
 The repository includes the following structure:
 
-- **`analysis/`**: Contains all codes for reproducing the results and figures. Run `analysis/analyze.py` to generate all results and figures. The first run will download the necessary data and processed results from OSF into this directory, which may take some time.
+- **`analysis/`**: Contains all codes for reproducing the results and figures. Run `analysis/analyze.py` to generate all results and figures.
 
 - **`human_expt/`**: Contains all codes for the 10-choice blurry object recognition experiment that run in a web browser, programmed in JS with jsPsych 7.3.3
 
