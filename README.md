@@ -54,7 +54,7 @@ The repository includes the following structure:
 
 - **`human_expt/`**: Contains all codes for the 10-choice blurry object recognition experiment that run in a web browser, programmed in JS with jsPsych 7.3.3
 
-- **`model_script/`**: Contains all codes for training and testing multiple instances of ANNs.
+- **`model_script/`**: Contains all codes for training and testing multiple instances of ANNs, including codes for subsetting EcoSet. 
 
 - **`requirements.txt`**: Lists all the required Python dependencies for the project.
 
