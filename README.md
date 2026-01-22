@@ -5,7 +5,7 @@ This project examines how individual differences in artificial neural networks c
 
 Full paper available on bioRxiv.
 
-This project is also presented at NeurIPS 2025 UniReps & Data on the Brain & Mind workshops. Earlier version paper is available [here](https://www.biorxiv.org/content/10.1101/2025.10.25.684448v1.abstract).
+This project is also presented at NeurIPS 2025 UniReps & Data on the Brain & Mind workshops. Earlier version of the paper is available [here](https://www.biorxiv.org/content/10.1101/2025.10.25.684448v1.abstract).
 
 
 ---
@@ -56,6 +56,13 @@ The repository includes the following structure:
 - **`model_script/`**: Contains all codes for training and testing multiple instances of ANNs.
 
 - **`requirements.txt`**: Lists all the required Python dependencies for the project.
+
+---
+
+## Citation
+If you use any materials from this project, please cite:
+
+Fung, H., Murty, N. A. R., & Rahnev, D. (2025). Human-like individual differences emerge from random weight initializations in neural networks (p. 2025.10.25.684448). bioRxiv. [https://doi.org/10.1101/2025.10.25.684448](https://doi.org/10.1101/2025.10.25.684448)
 
 ---
 
