@@ -4,6 +4,8 @@ analysis/IndiMap_results
 analysis/IndiMap_plots
 analysis/midb_data.tar.gz
 
+# macOS
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
