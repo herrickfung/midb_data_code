@@ -3,9 +3,10 @@
 ## Project Description
 This project examines how individual differences in artificial neural networks can capture and predict individual differences in human behavior across accuracy, confidence, and response time in digits and object recognition tasks.
 
-This project is presented at NeurIPS 2025 workshop on UniReps & Data on the Brain & Mind.
+Full paper available on bioRxiv.
 
-Full paper available on PsyArXiv.
+This project is also presented at NeurIPS 2025 UniReps & Data on the Brain & Mind workshops. Earlier version paper is available [here](https://www.biorxiv.org/content/10.1101/2025.10.25.684448v1.abstract).
+
 
 ---
 
@@ -50,7 +51,7 @@ The repository includes the following structure:
 
 - **`analysis/`**: Contains all codes for reproducing the results and figures. Run `analysis/analyze.py` to generate all results and figures. The first run will download the necessary data and processed results from OSF into this directory, which may take some time.
 
-- **`human_expt/`**: Contains all codes for the 16-choice blurry object recognition experiment that run in a web browser, programmed in JS with jsPsych 7.3.3
+- **`human_expt/`**: Contains all codes for the 10-choice blurry object recognition experiment that run in a web browser, programmed in JS with jsPsych 7.3.3
 
 - **`model_script/`**: Contains all codes for training and testing multiple instances of ANNs.
 
