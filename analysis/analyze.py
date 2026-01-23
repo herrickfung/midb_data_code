@@ -30,25 +30,23 @@ def manage_path():
 
 
 def download_and_extract_data(current_path):
-    OSF_DATA_URL = "https://files.osf.io/v1/resources/n6m7b/providers/osfstorage/6971900f32ee94449d69d5cb"
+    OSF_DATA_URL = "https://files.osf.io/v1/resources/n6m7b/providers/osfstorage/6973e304414e523357574403"
     tar_path = current_path / 'midb_data.tar.gz'
 
     data_path_for_check = [current_path / 'dataset', current_path / 'IndiMap_results']
     if all([p.exists() for p in data_path_for_check]):
         return
 
-    print("Downloading data from OSF...")
+    print("Downloading data from OSF, please wait ...")
     response = requests.get(OSF_DATA_URL, stream=True)
     with open(tar_path, 'wb') as f:
         for chunk in response.iter_content(chunk_size=8192):
             f.write(chunk)
 
-    print("Extracting data...")
     with tarfile.open(tar_path, 'r:gz') as tar:
         tar.extractall(path=current_path)
 
     tar_path.unlink()
-    print("Download and extraction completed.")
 
 
 def init_map():
@@ -66,7 +64,7 @@ def init_map():
 def compute(all_maps, load=False):
     """ Compute/load all results """
     for obj in all_maps:
-        obj.dims_map._convert_data_array()
+        # obj.dims_map._convert_data_array()
         obj.compute_all(load_exists=load)
 
 
@@ -78,12 +76,15 @@ def graph(all_data, path):
             data = mnists
         else:
             data = ecosets
-        
-        # plotting.plot_raincloud(data, expt, path)
+
+        plotting.plot_raincloud(data, expt, path)
         map_mat = plotting.plot_raw_matrix(data, expt, path)
         plotting.plot_alignment_average(map_mat, expt, path)
         plotting.plot_alignment_variance(data, expt, path)
         plotting.plot_across_metric_illustration(map_mat, expt, path, True)
+        plotting.plot_best_count_distribution(data, expt, path)
+        plotting.plot_within_metric_consistency(data, expt, path)
+        plotting.plot_across_metric_consistency(data, expt, path)
 
 
 def main():
