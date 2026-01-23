@@ -1136,3 +1136,348 @@ def plot_across_metric_consistency(data, name, path):
     plt.savefig(path_name, dpi=384, transparent=True)
     plt.close()
 
+
+def plot_pca_shuffle_comparison(data, name, path):
+    n_maps = len(data)
+    n_bs, n_conds, n_met, n_comps = data[0].dims_map.split_half_pca_results['proj_model_var'].shape
+
+    # unpack results
+    proj_same_human_var = data[0].dims_map.split_half_pca_results['proj_same_human_var']
+    proj_diff_human_var = data[0].dims_map.split_half_pca_results['proj_diff_human_var']
+    proj_scrm_human_var = data[0].dims_map.split_half_pca_results['proj_scrm_human_var']
+    proj_model_var = np.empty((n_maps, n_conds, n_met, n_comps))
+    proj_model_var.fill(np.nan)
+    for i in range(n_maps):
+        if i == 0:
+            proj_model_var[i] = data[i].dims_map.split_half_pca_results['proj_model_var'].mean(axis = 0)
+        else:
+            proj_model_var[i, :, :2, :] = data[i].dims_map.split_half_pca_results['proj_model_var'].mean(axis = 0)[:, :2, :]
+
+    mean_scrm_var = proj_scrm_human_var.mean(axis=0)
+    stack_comparison = np.stack([proj_same_human_var, proj_diff_human_var] + [proj_model_var[i] for i in range(n_maps)], axis=0)
+    diff_explained = stack_comparison - mean_scrm_var
+    perm_test = np.zeros((stack_comparison.shape[0],
+                          n_conds, n_met, n_comps,
+                          ))
+
+    for i in range(stack_comparison.shape[0]):
+        for cond in range(n_conds):
+            for met in range(n_met):
+                for comp in range(n_comps):
+                    test_val = stack_comparison[i, cond, met, comp]
+                    null_dist = proj_scrm_human_var[:, cond, met, comp]
+                    perm_test[i, cond, met, comp] = np.sum(test_val <= null_dist) / len(null_dist)
+
+
+    metric_label = ['Accuracy', 'Confidence', 'RT']
+    yticks = ['Same\nhumans', 'Held-out\nhumans', 'RTNet', 'AlexNet', 'ResNet18']
+    plt.clf()
+    fig, ax = plt.subplots(2, n_met, figsize=(12, 5))
+    for i in range(n_conds):
+        for j in range(n_met):
+            if j == 2:
+                ax[i,j].imshow(
+                    diff_explained[:3,i,j],
+                    aspect='auto',
+                    cmap='copper_r',
+                )
+            else:
+                ax[i,j].imshow(
+                    diff_explained[:,i,j],
+                    aspect='auto',
+                    cmap='copper_r',
+                )
+    
+            if j == 2:
+                ax[i,j].set_yticks([0,1,2], yticks[:3], fontsize=10)
+                ax[i,j].set_xticks(np.arange(10), np.arange(10) + 1, fontsize=8)
+                ax[i,j].set_xlabel('PCA components', fontsize=10)
+                ax[i,j].set_title(f'{metric_label[j]}', fontsize=12, fontweight='bold')
+            else:
+                ax[i,j].set_yticks(np.arange(len(yticks)), yticks, fontsize=10)
+                ax[i,j].set_xticks(np.arange(10), np.arange(10) + 1, fontsize=8)
+                ax[i,j].set_xlabel('PCA components', fontsize=10)
+                ax[i,j].set_title(f'{metric_label[j]}', fontsize=12, fontweight='bold')
+            
+            if np.any(perm_test[:, i, j] < 0.05):
+                for map_ in range(diff_explained.shape[0]):
+                    for comp in range(diff_explained.shape[3]):
+                        color = 'white' if diff_explained[map_, i, j, comp] > 0.05 else 'black'
+                        anno_text = "***" if perm_test[map_, i, j, comp] < 0.001 else "**" if perm_test[map_, i, j, comp] < 0.01 else "*" if perm_test[map_, i, j, comp] < 0.05 else ""
+                        ax[i,j].annotate(anno_text, xy=(comp, map_), color=color, fontsize=10, ha='center', va='center')
+
+    cbar_ax = fig.add_axes([0.92, 0.05, 0.02, 0.9])  # [left, bottom, width, height]
+    cbar = fig.colorbar(ax[0, 0].images[0], cax=cbar_ax, orientation='vertical')
+    cbar.ax.tick_params(labelsize=16)
+    plt.tight_layout(rect = [0, 0, 0.92, 1])
+    plt.savefig(path / f'pca_shuffle_comparison_{name}.png', dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_pca_cumulative_evidence_lineplot(data, name, path):
+    n_maps = len(data)
+    n_bs, n_conds, n_met, n_comps = data[0].dims_map.split_half_pca_results['proj_model_var'].shape
+
+    # unpack results
+    proj_same_human_var = data[0].dims_map.split_half_pca_results['proj_same_human_var']
+    proj_diff_human_var = data[0].dims_map.split_half_pca_results['proj_diff_human_var']
+    proj_scrm_human_var = data[0].dims_map.split_half_pca_results['proj_scrm_human_var'].mean(axis = 0)
+    proj_model_var = np.empty((n_maps, n_conds, n_met, n_comps))
+    proj_model_var.fill(np.nan)
+    for i in range(n_maps):
+        if i == 0:
+            proj_model_var[i] = data[i].dims_map.split_half_pca_results['proj_model_var'].mean(axis = 0)
+        else:
+            proj_model_var[i, :, :2, :] = data[i].dims_map.split_half_pca_results['proj_model_var'].mean(axis = 0)[:, :2, :]
+    plot_data = np.stack([proj_diff_human_var, proj_scrm_human_var] + [proj_model_var[i] for i in range(n_maps)], axis=0)
+
+    plt.clf()
+    figure, ax = plt.subplots(2, n_met, figsize=(7, 3.5))
+    # figure, ax = plt.subplots(2, n_met, figsize=(7, 5))
+    colors = plt.cm.get_cmap('Set1', 8)
+    colors = [colors(0), 'grey', colors(1), colors(2), colors(3)]
+    zorder = np.arange(len(colors))[::-1]
+    x_axis = np.arange(0, 11)
+    met_labels = ['Accuracy', 'Confidence', 'RT']
+    model_labels = ['Held-out Human', 'Scrambled Human', 'RTNet', 'AlexNet', 'ResNet18']
+    conds_labels = ['Accuracy Focus', 'Speed Focus']
+
+    for map_idx in range(plot_data.shape[0]):
+        for conds_idx in range(n_conds):
+            for metric in range(n_met):
+                print(f"{model_labels[map_idx]}, {conds_labels[conds_idx]}, {met_labels[metric]}:")
+                print(np.cumsum(plot_data[map_idx, conds_idx, metric])[-1]*100)
+                print()
+                ax[conds_idx, metric].plot(
+                    range(1, n_comps + 1),
+                    np.cumsum(plot_data[map_idx, conds_idx, metric]),
+                    color=colors[map_idx],
+                    linestyle='solid',
+                    lw=2.5, zorder=zorder[map_idx], alpha=0.75
+                )
+                ax[conds_idx, metric].set_xlim(0.1, 11)
+                # ax[conds_idx, metric].set_ylim(-0.05, 0.65)
+                ax[conds_idx, metric].set_xticks(x_axis[1:], x_axis[1:], fontsize=6)
+                ax[conds_idx, metric].tick_params(axis='y', labelsize=6)
+                ax[conds_idx, metric].set_xlabel('PCA components', fontsize=6, fontweight='bold')
+                ax[conds_idx, metric].set_ylabel('Cumulative Explained Variance', fontsize=6, fontweight='bold')
+                ax[conds_idx, metric].set_title(f'{met_labels[metric]}', fontsize=8, fontweight='bold')
+                ax[conds_idx, metric].spines['top'].set_visible(False)
+                ax[conds_idx, metric].spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    plt.savefig(path / f'pca_cumulative_explained_variance_{name}.png', dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_pca_total_variance_comparison_split_graph(data, name, path):
+    n_maps = len(data)
+    n_bs, n_cond, n_met, n_comps = data[0].dims_map.split_half_pca_results['proj_model_var'].shape
+
+    proj_human_var = data[0].dims_map.split_half_pca_results['proj_diff_human_var'].sum(axis = 2)
+    scrm_human_var = data[0].dims_map.split_half_pca_results['proj_scrm_human_var'].sum(axis = 3)
+    proj_model_var = np.empty((n_maps, n_bs, n_cond, n_met))
+    proj_model_var.fill(np.nan)
+    for i in range(n_maps):
+        if i == 0:
+            proj_model_var[i] = data[i].dims_map.split_half_pca_results['proj_model_var'].sum(axis=3)
+        else:
+            proj_model_var[i, :, :, :2] = data[i].dims_map.split_half_pca_results['proj_model_var'].sum(axis=3)
+
+    conds_labels = ['accuracy_focus', 'speed_focus']
+    for cond in range(n_cond):
+        for met in range(n_met):
+            plt.clf()
+            plt.figure(figsize=(3, 2))
+            colors = plt.cm.get_cmap('Set1', 8)
+            model_label = ['Held-out human', 'RTNet', 'AlexNet', 'ResNet18', 'Shuffled human']
+            metric_label = ['Accuracy', 'Confidence', 'RT']
+
+            for map_ in range(n_maps + 2):
+                x_pos = map_ * 0.8
+                met_human_arr = proj_human_var[cond, met]
+                scrm_human_arr = scrm_human_var[:, cond, met]
+                if map_ == 0:
+                    plt.bar(x_pos, met_human_arr, color=colors(map_), 
+                            label=model_label[map_] if met == 0 else None, alpha=0.75)
+                elif map_ == n_maps + 1:
+                    if met == 2:
+                        x_pos -= 1.6
+                    plt.bar(x_pos, np.nanmean(scrm_human_arr), 
+                            yerr=np.nanstd(scrm_human_arr),
+                            color='grey',
+                            label=model_label[map_] if met == 0 else None, alpha=0.75)
+                else:
+                    met_model_arr = proj_model_var[map_-1, :, cond, met] if map_ > 0 else None
+                    plt.bar(x_pos, np.nanmean(met_model_arr), 
+                            yerr=np.nanstd(met_model_arr),
+                            color=colors(map_), 
+                            label=model_label[map_] if met == 0 else None, 
+                            alpha=0.5)
+
+                    # annotation
+                    diff = met_model_arr - met_human_arr
+                    p_val = 2 * min(
+                        len(diff[diff >= 0]) / len(diff),
+                        len(diff[diff <= 0]) / len(diff)
+                    )
+                    ci_lower = np.percentile(diff, 2.5)
+                    ci_upper = np.percentile(diff, 97.5)
+                    x_mid = (map_ * 0.8) / 2  # Midpoint between bars
+                    y_max = np.nanmax(np.nanmean(proj_model_var[:, :, cond, met], axis = 1)) + 0.02 * map_ + 0.02
+
+                    alpha = 1
+                    if p_val < 0.001:
+                        anno = f'$p$ < 0.001'
+                    else:
+                        anno = f'$p$ = {p_val:.3f}'
+                    if map_ > 1 and met > 1:
+                        continue
+                    plt.plot([0, map_ * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                    plt.annotate(anno, (x_mid, y_max+0.002), textcoords="offset points", 
+                                 xytext=(0, 1), ha='center', size=8, alpha=alpha)
+
+                    print(f"Condition: {conds_labels[cond]}, Map: {model_label[map_]}, Metric: {metric_label[met]}, p-value: {p_val:.3f}")
+                    print(f"CI: [{ci_lower:.3f}, {ci_upper:.3f}]")
+                    print(f"Human: {met_human_arr}")
+                    print(f"Mean: {np.nanmean(met_model_arr):.5f}, Std: {np.nanstd(met_model_arr):.5f}")
+            
+            plt.xticks([], [])
+            # plt.ylim(0, 0.25)
+            plt.ylabel('Total explained variance', fontsize=10, fontweight='bold')
+            plt.gca().spines['top'].set_visible(False)
+            plt.gca().spines['right'].set_visible(False)
+            plt.tight_layout()
+            plt.savefig(path / f'dims_split_half_pca_{conds_labels[cond]}_{metric_label[met]}_{name}.png', dpi=384, transparent=True)
+            plt.close()
+
+
+def plot_pca_total_variance_comparison(data, name, path):
+    n_maps = len(data)
+    n_bs, n_cond, n_met, n_comps = data[0].dims_map.split_half_pca_results['proj_model_var'].shape
+
+    proj_human_var = data[0].dims_map.split_half_pca_results['proj_diff_human_var'].sum(axis = 2)
+    scrm_human_var = data[0].dims_map.split_half_pca_results['proj_scrm_human_var'].sum(axis = 3)
+    proj_model_var = np.empty((n_maps, n_bs, n_cond, n_met))
+    proj_model_var.fill(np.nan)
+    for i in range(n_maps):
+        if i == 0:
+            proj_model_var[i] = data[i].dims_map.split_half_pca_results['proj_model_var'].sum(axis=3)
+        else:
+            proj_model_var[i, :, :, :2] = data[i].dims_map.split_half_pca_results['proj_model_var'].sum(axis=3)
+
+    conds_labels = ['accuracy_focus', 'speed_focus']
+    for cond in range(n_cond):
+        plt.clf()
+        plt.figure(figsize=(6, 3))
+        colors = plt.cm.get_cmap('Set1', 8)
+        model_label = ['Held-out human', 'RTNet', 'AlexNet', 'ResNet18', 'Shuffled human']
+
+        if name == 'mnist' or name == 'ecoset10':
+            plt.xticks([1.6, 6.6, 10.8], 
+                        ['Accuracy', 'Confidence', 'RT'],
+                        fontsize=10
+                        )
+
+        for map_ in range(n_maps + 2):
+            for met in range(n_met):
+                x_pos = met * 5 + map_ * 0.8
+                met_human_arr = proj_human_var[cond, met]
+                scrm_human_arr = scrm_human_var[:, cond, met]
+                if map_ == 0:
+                    plt.bar(x_pos, met_human_arr, color=colors(map_), 
+                            label=model_label[map_] if met == 0 else None, alpha=0.75)
+                elif map_ == n_maps + 1:
+                    if met == 2:
+                        x_pos -= 1.6
+                    plt.bar(x_pos, np.nanmean(scrm_human_arr), 
+                            yerr=np.nanstd(scrm_human_arr),
+                            color='grey',
+                            label=model_label[map_] if met == 0 else None, alpha=0.75)
+                else:
+                    met_model_arr = proj_model_var[map_-1, :, cond, met] if map_ > 0 else None
+                    plt.bar(x_pos, np.nanmean(met_model_arr), 
+                            yerr=np.nanstd(met_model_arr),
+                            color=colors(map_), 
+                            label=model_label[map_] if met == 0 else None, 
+                            alpha=0.5)
+
+                    # annotation
+                    diff = met_model_arr - met_human_arr
+                    p_val = 2 * min(
+                        len(diff[diff >= 0]) / len(diff),
+                        len(diff[diff <= 0]) / len(diff)
+                    )
+                    ci_lower = np.percentile(diff, 2.5)
+                    ci_upper = np.percentile(diff, 97.5)
+                    x_mid = (met * 5 + met * 5 + map_ * 0.8) / 2  # Midpoint between bars
+                    y_max = np.nanmax(np.nanmean(proj_model_var[:, :, cond, met], axis = 1)) + 0.02 * map_ + 0.02
+
+                    alpha = 1
+                    if p_val < 0.001:
+                        anno = f'$p$ < 0.001'
+                    else:
+                        anno = f'$p$ = {p_val:.3f}'
+                    if map_ > 1 and met > 1:
+                        continue
+                    if p_val > 0.05:
+                        alpha=0.5
+                        plt.plot([met * 5, met * 5 + map_ * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                        plt.annotate(anno, (x_mid, y_max+0.002), textcoords="offset points", 
+                                    xytext=(0, 1), ha='center', size=8, alpha=alpha)
+
+                    print("=======================================")
+                    print("Annotation for model vs. Held-out human")
+                    print("=======================================")
+                    print(f"Map: {map_}, Metric: {met}, p-value: {p_val:.3f}")
+                    print(f"CI: [{ci_lower:.3f}, {ci_upper:.3f}]")
+                    print(f"Human: {met_human_arr}")
+                    print(f"Mean: {np.nanmean(met_model_arr):.5f}, Std: {np.nanstd(met_model_arr):.5f}")
+
+                    # annotate for shuffled
+                    shuffle_x_pos = 4 if met < 2 else 2
+                    diff = (met_model_arr[:, None] - scrm_human_arr[None, :]).ravel()
+                    p_val = 2 * min(
+                        len(diff[diff >= 0]) / len(diff),
+                        len(diff[diff <= 0]) / len(diff)
+                    )
+                    ci_lower = np.percentile(diff, 2.5)
+                    ci_upper = np.percentile(diff, 97.5)
+                    x_mid = (met * 5 + shuffle_x_pos * 0.8 + met * 5 + map_ * 0.8) / 2  # Midpoint between bars
+                    y_max = np.nanmax(np.nanmean(proj_model_var[:, :, cond, met], axis = 1)) + 0.02 * (4-map_)
+
+                    alpha = 1
+                    if p_val < 1e-6:
+                        anno = r'$p < 10^{-6}$'
+                    elif p_val < 0.001:
+                        power = int(np.floor(np.log10(p_val)))
+                        coefficient = p_val / (10 ** power)
+                        anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                    else:
+                        anno = r"$p = {:.3f}$".format(p_val)
+                    if map_ > 1 and met > 1:
+                        continue
+                    plt.plot([met * 5 + shuffle_x_pos * 0.8, met * 5 + map_ * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                    plt.annotate(anno, (x_mid, y_max+0.002), textcoords="offset points", 
+                                 xytext=(0, 1), ha='center', size=8, alpha=alpha)
+
+                    print("=======================================")
+                    print("Annotation for model vs. shuffled human")
+                    print("=======================================")
+                    print(f"Map: {map_}, Metric: {met}, p-value: {p_val:.6f}")
+                    print(f"CI: [{ci_lower:.3f}, {ci_upper:.3f}]")
+                    print(f"Human: {np.nanmean(scrm_human_arr):.5f}, Std: {np.nanstd(scrm_human_arr):.5f}")
+                    print(f"Mean: {np.nanmean(met_model_arr):.5f}, Std: {np.nanstd(met_model_arr):.5f}")
+
+
+        plt.ylim(0, 0.2)
+        plt.xlabel('Behavioral metrics', fontsize=10, fontweight='bold')
+        plt.ylabel('Total explained variance', fontsize=10)
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+
+        plt.legend(loc='upper left', fontsize=8, frameon=False)
+        plt.tight_layout()
+        plt.savefig(path / f'dims_split_half_pca_{conds_labels[cond]}_{name}.png', dpi=384, transparent=True)
+        plt.close()
+

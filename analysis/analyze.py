@@ -77,14 +77,18 @@ def graph(all_data, path):
         else:
             data = ecosets
 
-        plotting.plot_raincloud(data, expt, path)
-        map_mat = plotting.plot_raw_matrix(data, expt, path)
-        plotting.plot_alignment_average(map_mat, expt, path)
-        plotting.plot_alignment_variance(data, expt, path)
-        plotting.plot_across_metric_illustration(map_mat, expt, path, True)
-        plotting.plot_best_count_distribution(data, expt, path)
-        plotting.plot_within_metric_consistency(data, expt, path)
-        plotting.plot_across_metric_consistency(data, expt, path)
+        # plotting.plot_raincloud(data, expt, path)
+        # map_mat = plotting.plot_raw_matrix(data, expt, path)
+        # plotting.plot_alignment_average(map_mat, expt, path)
+        # plotting.plot_alignment_variance(data, expt, path)
+        # plotting.plot_across_metric_illustration(map_mat, expt, path, True)
+        # plotting.plot_best_count_distribution(data, expt, path)
+        # plotting.plot_within_metric_consistency(data, expt, path)
+        # plotting.plot_across_metric_consistency(data, expt, path)
+        # plotting.plot_pca_shuffle_comparison(data, expt, path)
+        # plotting.plot_pca_cumulative_evidence_lineplot(data, expt, path)
+        # plotting.plot_pca_total_variance_comparison(data, expt, path)
+        # plotting.plot_pca_total_variance_comparison_split_graph(data, expt, path)
 
 
 def main():
