@@ -1,22 +1,9 @@
 """ main analysis and plot script """
-
-
-from itertools import combinations
-from matplotlib import rcParams
-from matplotlib.colors import ListedColormap
-from scipy.stats import sem
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
 import pathlib
-import pingouin as pg
-import seaborn as sns
-import scipy.stats as stats
 import requests
 import tarfile
 
 from indimap import IndiMap
-from indimap.util import map_func, stat_func
 import util.dataset as dataset
 import util.plotting as plotting
 
@@ -77,24 +64,20 @@ def graph(all_data, path):
         else:
             data = ecosets
 
-        # plotting.plot_raincloud(data, expt, path)
-        # map_mat = plotting.plot_raw_matrix(data, expt, path)
-        # plotting.plot_alignment_average(map_mat, expt, path)
-        # plotting.plot_alignment_variance(data, expt, path)
-        # plotting.plot_across_metric_illustration(map_mat, expt, path, True)
-        # plotting.plot_best_count_distribution(data, expt, path)
-        # plotting.plot_within_metric_consistency(data, expt, path)
-        # plotting.plot_across_metric_consistency(data, expt, path)
-        # plotting.plot_pca_shuffle_comparison(data, expt, path)
-        # plotting.plot_pca_cumulative_evidence_lineplot(data, expt, path)
-        # plotting.plot_pca_total_variance_comparison(data, expt, path)
-        # plotting.plot_pca_total_variance_comparison_split_graph(data, expt, path)
-        # raw_pred = plotting.plot_within_metric_prediction_raw(data, expt, path)
-        # plotting.plot_within_metric_prediction_diff(raw_pred, expt, path)
-
-        # TDL:
-        raw_pred = plotting.plot_across_metric_prediction_raw(data, expt, path)
-        plotting.plot_across_metric_prediction_diff(raw_pred, expt, path)
+        plotting.plot_raincloud(data, expt, path)
+        map_mat = plotting.plot_raw_matrix(data, expt, path)
+        plotting.plot_alignment_average(map_mat, expt, path)
+        plotting.plot_alignment_variance(data, expt, path)
+        plotting.plot_across_metric_illustration(map_mat, expt, path)
+        plotting.plot_best_count_distribution(data, expt, path)
+        plotting.plot_within_metric_consistency(data, expt, path)
+        plotting.plot_across_metric_consistency(data, expt, path)
+        plotting.plot_pca_shuffle_comparison(data, expt, path)
+        plotting.plot_pca_cumulative_evidence_lineplot(data, expt, path)
+        plotting.plot_pca_total_variance_comparison(data, expt, path)
+        plotting.plot_pca_total_variance_comparison_split_graph(data, expt, path)
+        raw_pred = plotting.plot_within_metric_prediction_raw(data, expt, path)
+        plotting.plot_within_metric_prediction_diff(raw_pred, expt, path)
 
 
 def main():
