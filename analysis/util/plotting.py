@@ -1481,3 +1481,430 @@ def plot_pca_total_variance_comparison(data, name, path):
         plt.savefig(path / f'dims_split_half_pca_{conds_labels[cond]}_{name}.png', dpi=384, transparent=True)
         plt.close()
 
+
+def plot_within_metric_prediction_raw(data, name, path):
+    n_maps = len(data) + 1
+    n_boots, n_metrics, n_subjs = data[0].get_pred_results('subj', 'avg', True).mat.shape
+    methods = ['avg', 'corr']
+    plot_data = np.empty((len(methods), n_maps, n_metrics, n_subjs))
+    plot_data.fill(np.nan)
+
+    for i, method in enumerate(methods):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                result = data[map_idx].get_pred_results('subj', method, True).mat
+            else:
+                result = data[map_idx-1].get_pred_results('inst', method, True).mat
+            result = stat_func.r2z(result, metric='pearson')
+            result = np.nanmean(result, axis = 0)
+            try:
+                plot_data[i, map_idx] = result
+            except ValueError:
+                plot_data[i, map_idx, :2] = result
+    plot_data = stat_func.z2r(plot_data, metric='pearson')
+
+    plt.clf()
+    fig, ax = plt.subplots(1, n_metrics, figsize=(10.5, 3.5))
+    colors = plt.cm.get_cmap('Set1', 8)
+    model_label = ['Subject', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = ['Unweighted \naverage', 'Weighted\naverage']
+    titles = ['Accuracy', 'Confidence', 'RT']
+
+    for meth in range(len(methods)):
+        for map_idx in range(n_maps):
+            for met in range(n_metrics):
+                x_pos = map_idx * 0.8 + meth * 5
+                if not np.isnan(plot_data[meth, map_idx, met, :]).all():
+                    ax[met].scatter(x_pos,
+                        np.mean(plot_data[meth, map_idx, met, :]),
+                        color=colors(map_idx), label=model_label[map_idx] if meth == 0 else None,
+                        alpha = 1, marker='d'
+                        )
+                for k in range(n_subjs):
+                    ax[met].scatter(x_pos,
+                                plot_data[meth, map_idx, met, k],
+                                color=colors(map_idx), s=1, alpha=0.5
+                                )
+                ax[met].legend(loc='upper right', fontsize=8, frameon=False)
+                ax[met].set_xlabel(r'Method of prediction', fontsize=10, fontweight='bold')
+                ax[met].set_ylabel(r'Predictive accuracy ($\rho$)', fontsize=10, fontweight='bold')
+                if met < 2:
+                    ax[met].set_xlim(-2, 12)
+                    ax[met].set_xticks([1.2, 6.2], map_labels)
+                    # ax[met].set_ylim(-0.1, 1.15)
+                else:
+                    ax[met].set_xlim(-2, 10)
+                    ax[met].set_xticks([0.4, 5.4], map_labels)
+                    # ax[met].set_ylim(-0.1, 0.95)
+                ax[met].set_title(f'{titles[met]}', fontsize=14, fontweight='bold')
+                ax[met].spines['top'].set_visible(False)
+                ax[met].spines['right'].set_visible(False)
+
+    for met in range(n_metrics):
+        for map_ in range(n_maps):
+            a = stat_func.r2z(plot_data[0, map_, met, :], 'pearson') 
+            b = stat_func.r2z(plot_data[1, map_, met, :], 'pearson')
+            results = stats.ttest_rel(a, b)  # average vs corr weight
+            p_val = results.pvalue
+            print(f'Difference: {np.mean(plot_data[0, map_, met, :]) - np.mean(plot_data[1, map_, met, :]):.4f}')
+            print(f"Metric: {titles[met]}, Map: {model_label[map_]}, Method: {methods[1]}, t-value: {results.statistic:.4f}, p-value: {p_val}")
+
+            if p_val < 1e-3:
+                power = int(np.floor(np.log10(p_val)))
+                coefficient = p_val / (10 ** power)
+                annotation = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+            else:
+                annotation = r"$p = {:.3f}$".format(p_val)
+
+            if met < 2:
+                y_pos = 0.75
+                y_pos = 0.9
+            else:
+                y_pos = 0.5
+            x1, x2 = map_ * 0.8 , map_ * 0.8 + 5
+            y, h, col = y_pos + 0.1 * (3 - map_), 0.01, colors(map_)  # y position, height, and color
+
+            if not np.isnan(p_val):
+            # if not np.isnan(p_val) and p_val < 0.05:
+                ax[met].plot([x1, x1, x2, x2], [y,y,y,y], lw=1.5, color=col)
+                ax[met].annotate(annotation, xy=((x1+x2)/2, y_pos + 0.1 * (3 - map_)), fontsize=6,
+                    ha='center', va='bottom',
+                    color=colors(map_)
+                    )
+
+    plt.suptitle('Within-metric prediction', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    path_name = path / f'pred_wn_var_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+    return plot_data
+
+
+def plot_within_metric_prediction_diff(data, name, path):
+    plot_data = np.diff(data, axis = 0).squeeze()
+    n_maps, n_metrics, n_subjs = plot_data.shape
+
+    plt.clf()
+    plt.figure(figsize=(6, 3))
+    colors = plt.cm.get_cmap('Set1', 8)
+    titles = ['Accuracy', 'Confidence', 'RT']
+
+    if name == 'mnist' or name == 'ecoset10':
+        model_label = ['Subject', 'RTNet', 'AlexNet', 'ResNet18']
+        plt.xticks([1.2, 6.2, 10.4], 
+                    ['Accuracy', 'Confidence', 'RT'],
+                    fontsize=12
+                    )
+    else:
+        model_label = ['Subject', 'AlexNet', 'ResNet18']
+        colors = tuple(colors(i) for i in [0, 2, 3])
+        colors = ListedColormap(colors)
+        plt.xticks([0.8, 5.8], 
+                    ['Accuracy', 'Confidence'],
+                    fontsize=12
+                    )
+
+    for map_ in range(n_maps):
+        for met in range(n_metrics):
+            x_pos = met * 5 + map_ * 0.8
+            plt.bar(x_pos,
+                    np.mean(plot_data[map_, met, :]),
+                    yerr=stats.sem(plot_data[map_, met, :]),
+                    color=colors(map_), label=model_label[map_] if met == 0 else None,
+                    alpha = 0.5
+                    )
+            # for k in range(n_subjs):
+            #     plt.scatter(x_pos - 0.25,
+            #                 plot_data[map_, met, k],
+            #                 color=colors(map_), s=5
+            #                 )
+
+    for met in range(n_metrics):
+        sub_data = plot_data[:, met, :]
+        for i, j in combinations(range(n_maps), 2):
+            if i != 0:
+                continue
+            if met == 2 and j > 1:
+                continue
+
+            data_i = stat_func.r2z(sub_data[i], 'pearson')
+            data_j = stat_func.r2z(sub_data[j], 'pearson')
+            t_stat, p_val = stats.ttest_rel(data_i, data_j)  # average vs corr weight
+            print(f"Metric: {titles[met]}, Map1: {model_label[i]}, Map2: {model_label[j]}, t-value: {t_stat:.4f}, p-value: {p_val}")
+
+            if p_val < 1e-3:
+                power = int(np.floor(np.log10(p_val)))
+                coefficient = p_val / (10 ** power)
+                anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+            else:
+                anno = r"$p = {:.3f}$".format(p_val)
+
+            if p_val < 0.05:
+                alpha = 1
+            else:
+                alpha = 0.5
+
+            x_mid = (met * 5 + i * 0.8 + met * 5 + j * 0.8) / 2  # Midpoint between bars
+            if name == 'mnist':
+                y_max = 0.0250 + j * 0.0075 - 0.005
+                plt.ylim(-0.02, 0.05)
+            if name == 'ecoset10':
+                y_max = 0.002 + j * 0.001 - 0.0005
+                if met == 2:
+                    y_max += 0.005
+                plt.ylim(-0.002, 0.01)
+            plt.plot([met * 5 + i * 0.8, met * 5 + j * 0.8], [y_max, y_max], color='black', lw=1, alpha=alpha)
+            plt.annotate(anno, xy=(x_mid, y_max), xytext=(0, 2.5), textcoords='offset points', ha='center', fontsize=8, alpha=alpha)
+
+    plt.xlabel('Behavioral metrics', fontsize=12, fontweight='bold')
+    plt.ylabel(r'$r_{weighted} - r_{unweighted}$', fontsize=12)
+    plt.axhline(0, color='black', lw=1, ls='dotted', alpha=0.8)
+    plt.xlim(-1, 15.5)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+
+    plt.legend(loc='upper right', fontsize=10, frameon=False)
+    plt.title('Within-metric prediction', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    path_name = path / f'pred_wn_var_diff_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_across_metric_prediction_raw(data, name, path):
+    n_maps = len(data) + 1
+    n_boots, n_metrics, n_subjs = data[0].get_pred_results('subj', 'avg', False).mat.shape
+    methods = ['avg', 'corr']
+    plot_data = np.empty((len(methods), n_maps, n_metrics, n_subjs))
+    plot_data.fill(np.nan)
+
+    for i, method in enumerate(methods):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                result = data[map_idx].get_pred_results('subj', method, False).mat
+            else:
+                result = data[map_idx-1].get_pred_results('inst', method, False).mat
+            result = stat_func.r2z(result, metric='pearson')
+            result = np.nanmean(result, axis = 0)
+            try:
+                plot_data[i, map_idx] = result
+            except ValueError:
+                plot_data[i, map_idx, :2] = result
+    plot_data = stat_func.z2r(plot_data, metric='pearson')
+    if n_metrics > 2:
+        plot_data[:, :2, [0, 1, 2, 3, 4, 5], :] = plot_data[:, :2, [1, 4, 0, 2, 5, 3], :]
+
+    plt.clf()
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    if name == 'mnist' or name == 'ecoset10':
+        fig, ax = plt.subplots(2, 3, figsize=(11, 6.5))
+        ax = ax.flatten()
+        map_labels = ['Unweighted\naverage', 'Weighted\naverage']
+        model_label = ['Subject', 'RTNet', 'AlexNet', 'ResNet18']
+        titles = [r'Accuracy $\rightarrow$ Confidence', r'Confidence $\rightarrow$ Accuracy',
+                r'Accuracy $\rightarrow$ RT', r'RT $\rightarrow$ Accuracy',
+                r'Confidence $\rightarrow$ RT', r'RT $\rightarrow$ Confidence',
+                ]
+        met_order = [0, 3, 1, 4, 5, 2]
+    else:
+        fig, ax = plt.subplots(1, 2, figsize=(7.5, 4))
+        ax = ax.flatten()
+        colors = tuple(colors(i) for i in [0, 2, 3])
+        colors = ListedColormap(colors)
+        map_labels = ['Unweighted\naverage', 'Weighted\naverage']
+        model_label = ['Subject', 'AlexNet', 'ResNet18']
+        titles = [r'Accuracy $\rightarrow$ Confidence', r'Confidence $\rightarrow$ Accuracy']
+        met_order = [0, 1]
+
+    for map_ in range(n_maps):
+        for meth in range(len(methods)):
+            for metric in range(n_metrics):
+                met = met_order[metric]
+                x_pos = meth * 5 + map_ * 0.8
+                if not np.isnan(plot_data[meth, map_, metric, :]).all():
+                    ax[met].scatter(x_pos,
+                        np.nanmean(np.abs(plot_data[meth,map_,metric,:])),
+                        color=colors(map_), label=model_label[map_] if meth == 0 else None,
+                        alpha = 1, marker='d'
+                        )
+                for k in range(n_subjs):
+                    ax[met].scatter(x_pos,
+                                np.abs(plot_data[meth, map_, metric, k]),
+                                color=colors(map_), s=1, alpha=0.5
+                                )
+                ax[met].legend(loc='upper right', fontsize=8, frameon=False)
+                ax[met].set_xlabel(r'Method of prediction', fontsize=10, fontweight='bold')
+                ax[met].set_ylabel(r'Predictive accuracy ($\rho$)', fontsize=10, fontweight='bold')
+                if metric < 2:
+                    ax[met].set_xlim(-2, 12)
+                    ax[met].set_xticks([1.2, 6.2], map_labels)
+                else:
+                    ax[met].set_xlim(-2, 10)
+                    ax[met].set_xticks([0.4, 5.4], map_labels)
+                ax[met].set_ylim(-0.05, 1)
+                ax[met].set_title(f'{titles[metric]}', fontsize=12, fontweight='bold')
+                ax[met].spines['top'].set_visible(False)
+                ax[met].spines['right'].set_visible(False)
+
+    for metric in range(n_metrics):
+        for map_ in range(n_maps):
+            met = met_order[metric]
+            unweighted_data = plot_data[0, map_, metric, :]
+            weighted_data = plot_data[1, map_, metric, :]
+            results = stats.ttest_rel(stat_func.r2z(unweighted_data, 'pearson'), 
+                                    stat_func.r2z(weighted_data, 'pearson')
+                                    )  # average vs corr weight
+
+            p_val = results.pvalue
+            print(f"Metric: {titles[metric]}, Map: {model_label[map_]}, Method: {methods[1]}, t-value: {results.statistic:.4f}, p-value: {p_val}")
+            print(f'diff = {weighted_data.mean() - unweighted_data.mean()}')
+            print()
+
+            if p_val < 1e-3:
+                power = int(np.floor(np.log10(p_val)))
+                coefficient = p_val / (10 ** power)
+                annotation = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+            else:
+                annotation = r"$p = {:.3f}$".format(p_val)
+
+            if metric < 2:
+                y_pos = 0.65
+            else:
+                y_pos = 0.55
+
+            x1, x2 = map_ * 0.8, map_ * 0.8 + 5
+            y, h, col = y_pos + 0.08 * (3 - map_), 0.02, colors(map_)  # y position, height, and color
+            # if not np.isnan(p_val) and p_val < 0.05:
+            if not np.isnan(p_val):
+                ax[met].plot([x1, x1, x2, x2], [y,y,y,y], lw=1.5, color=col)
+                ax[met].annotate(annotation, xy=((x1+x2)/2, y + 0.025), fontsize=6,
+                    ha='center', va='center',
+                    color=colors(map_)
+                    )
+
+    plt.suptitle('Across-metric prediction', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    path_name = path / f'pred_btw_var_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+    return plot_data
+
+
+def plot_across_metric_prediction_diff(data, name, path):
+    plot_data = np.abs(data)
+    plot_data = np.diff(plot_data, axis = 0).squeeze()
+    n_maps, n_metrics, n_subjs = plot_data.shape
+
+    plt.clf()
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    if name == 'mnist' or name == 'ecoset10':
+        plt.figure(figsize=(6, 5))
+        model_label = ['Subject', 'RTNet', 'AlexNet', 'ResNet18']
+        titles = ['Accuracy\nConfidence', 'Confidence\nAccuracy',
+                'Accuracy\nRT', 'RT\nAccuracy',
+                'Confidence\nRT', 'RT\nConfidence',
+                ]
+        plt.xticks([1.2, 6.2, 10.4, 13.4, 16.4, 19.4], titles,
+                    fontsize=10
+                    )
+        plt.xlim(-2, 28)
+        plt.ylim(-0.18, 0.25)
+
+        arrow_x = 21.5
+        arrow_y = 0.02
+        plt.arrow(arrow_x, 0, 0, arrow_y, head_width=0.25, head_length=0.005, width=0.05,fc='k', ec='k')
+        plt.arrow(arrow_x, 0, 0, -arrow_y, head_width=0.25, head_length=0.005, width=0.05,fc='k', ec='k')
+        plt.annotate('Better prediction\n with weighting', xy=(arrow_x + 0.25, 0.02), xytext=(0, 0), textcoords='offset points',
+                    fontsize=8, color='black', fontweight='bold')
+        plt.annotate('Better prediction\n without weighting', xy=(arrow_x + 0.25, -0.06), xytext=(0, 0), textcoords='offset points',
+                    fontsize=8, color='black', fontweight='bold')
+    
+    else:
+        plt.figure(figsize=(6, 5))
+        model_label = ['Subject', 'AlexNet', 'ResNet18']
+        titles = ['Accuracy\nConfidence', 'Confidence\nAccuracy']
+        plt.xticks([0.8, 5.8], titles,
+                    fontsize=10
+                    )
+        plt.xlim(-2, 12)
+        plt.ylim(-0.08, 0.08)
+
+        arrow_x = 9.5
+        arrow_y = 0.005
+        plt.arrow(arrow_x, 0, 0, arrow_y, head_width=0.25, head_length=0.005, width=0.05,fc='k', ec='k')
+        plt.arrow(arrow_x, 0, 0, -arrow_y, head_width=0.25, head_length=0.005, width=0.05,fc='k', ec='k')
+        plt.annotate('Better prediction\n with weighting', xy=(arrow_x + 0.25, 0.01), xytext=(0, 0), textcoords='offset points',
+                    fontsize=8, color='black', fontweight='bold')
+        plt.annotate('Better prediction\n without weighting', xy=(arrow_x + 0.25, -0.02), xytext=(0, 0), textcoords='offset points',
+                    fontsize=8, color='black', fontweight='bold')
+
+    for map_ in range(n_maps):
+        for met in range(n_metrics):
+            if met < 2:
+                x_pos = met * 5 + map_ * 0.8
+            else:
+                x_pos = met * 3 + map_ * 0.8 + 4
+            plt.bar(x_pos, 
+                    np.nanmean(plot_data[map_, met, :]),
+                    yerr=stats.sem(plot_data[map_, met, :]),
+                    color=colors(map_), label=model_label[map_] if met == 0 else None,
+                    alpha = 0.5
+                    )
+            for k in range(n_subjs):
+                plt.scatter(x_pos - 0.25,
+                            plot_data[map_, met, k],
+                            color=colors(map_), s=5
+                            )
+        
+    for met in range(n_metrics):
+        sub_data = plot_data[:, met, :]
+        for i, j in combinations(range(n_maps), 2):
+            if i != 0:
+                continue
+            if j> 1 and met > 1:
+                continue
+
+            data_i = stat_func.r2z(sub_data[i], 'pearson')
+            data_j = stat_func.r2z(sub_data[j], 'pearson')
+            t_stat, p_val = stats.ttest_rel(data_i, data_j)  # average vs corr weight
+            print(f"Metric: {titles[met]}, Map1: {model_label[i]}, Map2: {model_label[j]}, t-value: {t_stat:.4f}, p-value: {p_val}")
+
+            if p_val < 1e-3:
+                power = int(np.floor(np.log10(p_val)))
+                coefficient = p_val / (10 ** power)
+                anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+            else:
+                anno = r"$p = {:.3f}$".format(p_val)
+
+            if p_val < 0.05:
+                alpha = 1
+            else:
+                alpha = 0.5
+
+            y_max = np.nanmax(sub_data) + j * 0.025 - 0.01
+            if met == 3:
+                y_max +=0.035
+            if met < 2:
+                x_mid = (met * 5 + i * 0.8 + met * 5 + j * 0.8) / 2  # Midpoint between bars
+                plt.plot([met * 5 + i * 0.8, met * 5 + j * 0.8], [y_max, y_max], color='black', lw=1, alpha=alpha)
+            else:
+                x_mid = (met * 3 + i * 0.8 + 4 + met * 3 + j * 0.8 + 4) / 2
+                plt.plot([met * 3 + i * 0.8 + 4, met * 3 + j * 0.8 + 4], [y_max, y_max], color='black', lw=1, alpha=alpha)
+            plt.annotate(anno, xy=(x_mid, y_max), xytext=(0, 2), textcoords='offset points', ha='center', fontsize=8, alpha=alpha)
+
+    # plt.xlabel('\nPredictor\n' + r'$\rightarrow$Target', fontsize=12, fontweight='bold')
+    plt.axhline(0, color='black', lw=1, ls='dotted', alpha=0.8)
+    plt.ylabel(r'$r_{weighted} - r_{unweighted}$', fontsize=12)
+
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    
+
+    plt.legend(loc='upper right', fontsize=10, frameon=False)
+    plt.title('Across-metric prediction', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    path_name = path / f'pred_btw_var_diff_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
