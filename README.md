@@ -1,4 +1,4 @@
-# Data and codes for "Individual differences in artificial neural networks capture individual differences in human behavior"
+# Data and code for "Individual differences in artificial neural networks capture individual differences in human behavior"
 
 ## Project Description
 This project examines how individual differences in artificial neural networks can capture and predict individual differences in human behavior across accuracy, confidence, and response time in digits and object recognition tasks.
@@ -21,7 +21,7 @@ git clone https://github.com/herrickfung/midb_data_code.git
 cd midb_data_code
 ```
 
-### 2. Set up a Python enviornment (optional but recommended)
+### 2. Set up a Python environment (optional but recommended)
 ```bash
 python3 -m venv ./venv/
 source ./venv/bin/activate
@@ -50,13 +50,13 @@ pip install git+https://github.com/herrickfung/IndiMap.git
 
 The repository includes the following structure:
 
-- **`analysis/`**: Contains all codes for reproducing the results and figures. 
-     - By default, running `python3 analyze.py` loads precomputed results and generates the figures reported in the paper. 
-     - To recompute all results from the dataset, pass the flag `--recompute`. This takes about 30 minutes.
+- **`analysis/`**: Contains all code for reproducing the results and figures. 
+     - By default, running `python3 analyze.py` downloads the data (hosted long-term on [OSF](https://osf.io/n6m7b/files/dqc9s); no manual download is needed), loads precomputed results and generates the figures reported in the paper. 
+     - To recompute all results from raw data, pass the `--recompute` flag. This will take about 30 minutes.
 
-- **`human_expt/`**: Contains all codes for the 10-choice blurry object recognition experiment that run in a web browser, programmed in JS with jsPsych 7.3.3
+- **`human_expt/`**: Contains all code for the 10-choice blurry object recognition experiment that run in a web browser, programmed in JS with jsPsych 7.3.3
 
-- **`model_script/`**: Contains all codes for training and testing multiple instances of ANNs, including codes for subsetting EcoSet. 
+- **`model_script/`**: Contains all code for training and testing multiple instances of ANNs, including codes for subsetting EcoSet. 
 
 - **`requirements.txt`**: Lists all the required Python dependencies for the project.
 
@@ -69,5 +69,5 @@ Fung, H., Murty, N. A. R., & Rahnev, D. (2025). Human-like individual difference
 
 ---
 
-## Enquires
+## Enquiries
 [Herrick Fung](mailto:herrickfung@gmail.com)
