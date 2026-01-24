@@ -50,7 +50,9 @@ pip install git+https://github.com/herrickfung/IndiMap.git
 
 The repository includes the following structure:
 
-- **`analysis/`**: Contains all codes for reproducing the results and figures. Run `analysis/analyze.py` to generate all results and figures.
+- **`analysis/`**: Contains all codes for reproducing the results and figures. 
+     - By default, running `python3 analyze.py` loads precomputed results and generates the figures reported in the paper. 
+     - To recompute all results from the dataset, pass the flag `--recompute`. This takes about 30 minutes.
 
 - **`human_expt/`**: Contains all codes for the 10-choice blurry object recognition experiment that run in a web browser, programmed in JS with jsPsych 7.3.3
 

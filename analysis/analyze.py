@@ -1,4 +1,5 @@
 """ main analysis and plot script """
+import argparse
 import pathlib
 import requests
 import tarfile
@@ -17,7 +18,7 @@ def manage_path():
 
 
 def download_and_extract_data(current_path):
-    OSF_DATA_URL = "https://files.osf.io/v1/resources/n6m7b/providers/osfstorage/6973e304414e523357574403"
+    OSF_DATA_URL = "https://files.osf.io/v1/resources/n6m7b/providers/osfstorage/69741b25a94a8b2b80bb82dc"
     tar_path = current_path / 'midb_data.tar.gz'
 
     data_path_for_check = [current_path / 'dataset', current_path / 'IndiMap_results']
@@ -51,7 +52,7 @@ def init_map():
 def compute(all_maps, load=False):
     """ Compute/load all results """
     for obj in all_maps:
-        # obj.dims_map._convert_data_array()
+        obj.dims_map._convert_data_array()
         obj.compute_all(load_exists=load)
 
 
@@ -81,10 +82,16 @@ def graph(all_data, path):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Run analysis and plotting for IndiMap experiments")
+    parser.add_argument('--recompute', default=False, action='store_true',
+                        help='Recompute all results instead of loading')
+    args = parser.parse_args()
+    load = not args.recompute
+
     current_path, graph_path = manage_path()
     download_and_extract_data(current_path)
     all_maps = init_map()
-    compute(all_maps, load=True)
+    compute(all_maps, load=load)
     graph(all_maps, graph_path)
 
 
