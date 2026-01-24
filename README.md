@@ -36,12 +36,11 @@ source ./venv/bin/activate
 6. pingouin==0.5.5
 7. seaborn==0.13.2
 8. requests==2.32.5
-9. [indimap](https://github.com/herrickfung/IndiMap)==0.1.0
+9. [IndiMap](https://github.com/herrickfung/IndiMap)==0.1.1
 
 To install these dependencies, 
 ```bash
 pip install -r requirements.txt
-pip install git+https://github.com/herrickfung/IndiMap.git
 ```
 
 ---
