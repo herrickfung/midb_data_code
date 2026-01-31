@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 from itertools import combinations, permutations
-from scipy.stats import sem
+from scipy.stats import sem, wasserstein_distance
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -10,21 +10,130 @@ import pingouin as pg
 
 from indimap.util import map_func, stat_func
 
+
+def plot_wasserstein(data, name, path):
+    n_maps, n_metrics, n_subjs, n_trials = data.shape
+    n_pairs = n_subjs * (n_subjs - 1) // 2
+    dists = np.empty((n_maps, n_metrics, n_pairs))
+
+    for map_idx in range(n_maps):
+        for met_idx in range(n_metrics):
+            if met_idx > 0:
+                vec = data[map_idx, met_idx]
+                vec = vec / np.mean(vec)
+                data[map_idx, met_idx] = vec
+
+    for map_idx in range(n_maps):
+        for met_idx in range(n_metrics):
+            specs = []
+            for i, j in combinations(range(n_subjs), 2):
+                # dist = np.abs(data[map_idx, met_idx, i] - data[map_idx, met_idx, j])
+                dist = wasserstein_distance(
+                    data[map_idx, met_idx, i],
+                    data[map_idx, met_idx, j]
+                )
+                specs.append(dist)
+            dists[map_idx, met_idx] = specs
+
+    print('Wasserstein distances:')
+    print(dists.mean(axis=2))
+    print(dists.std(axis=2))
+
+    if name == 'ecoset10' or name == 'mnist':
+        model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+        colors = plt.cm.get_cmap('Set1', 8)
+    elif name == 'imagenet':
+        model_labels = ['Human', 'AlexNet', 'ResNet18']
+        colors = plt.cm.get_cmap('Set1', 8)
+        colors = tuple(colors(i) for i in [0, 2, 3])
+        colors = ListedColormap(colors)
+
+    plt.clf()
+    if name == 'mnist' or name == 'ecoset10':
+        figure, ax = plt.subplots(1, n_metrics, figsize=(8, 3))
+    else:
+        figure, ax = plt.subplots(1, n_metrics, figsize=(5, 3))
+    met_titles = ['Accuracy', 'Confidence', 'RT']
+
+    for met_idx in range(n_metrics):
+        plot_data = []
+        plot_labels = []
+        for map_idx in range(n_maps):
+            if met_idx == 2 and map_idx > 1:
+                continue
+            plot_data.extend(dists[map_idx, met_idx])
+            plot_labels.extend([model_labels[map_idx]] * len(dists[map_idx, met_idx]))
+        df_plot = pd.DataFrame({'value': plot_data, 'model': plot_labels})
+
+        # Raincloud plot: violin + strip
+        sns.violinplot(
+            y='model',
+            x='value',
+            data=df_plot,
+            ax=ax[met_idx],
+            inner=None,
+            palette=list(colors.colors) if hasattr(colors, 'colors') else colors.colors,
+            alpha=0.5,
+            linewidth=0
+        )
+
+        for collection in ax[met_idx].collections:
+            _paths = collection.get_paths()[0]
+            vertices = _paths.vertices
+            mean_y = vertices[:, 1].mean()
+            vertices[vertices[:, 1] > mean_y, 1] = mean_y  # clip below mean y
+
+        sns.pointplot(
+            y='model',
+            x='value',
+            data=df_plot,
+            ax=ax[met_idx],
+            join=False,              # Don't connect the points
+            ci='sd',                 # Show standard deviation as error bars
+            color='black',           # Color of points and bars
+            errwidth=1.5,            # Width of error bars
+            markers='D',              # Marker style 'D' for diamond
+            markersize=2
+        )
+
+        ax[met_idx].set_ylabel("", fontsize=6)
+        ax[met_idx].set_title(met_titles[met_idx], fontsize=10, fontweight='bold')
+        ax[met_idx].tick_params(axis='y', labelsize=6)
+        ax[met_idx].tick_params(axis='x', labelsize=6)
+        ax[met_idx].spines['top'].set_visible(False)
+        ax[met_idx].spines['right'].set_visible(False)
+        ax[met_idx].spines['left'].set_visible(False)
+        ax[met_idx].set_xlabel('Pairwise Wasserstein distance', fontsize=8, fontweight='bold')
+
+        if met_idx < 2:
+            ax[met_idx].set_yticks([x for x in range(n_maps)])
+            ax[met_idx].set_yticklabels(model_labels, fontsize=8)
+        else:
+            ax[met_idx].set_yticks([x for x in range(2)])
+            ax[met_idx].set_yticklabels(model_labels[:2], fontsize=8)
+
+    plt.tight_layout()
+    plt.savefig(f"{path}/wasserstein_{name}.png", dpi=384, transparent=True)
+    plt.close()
+
+
 def plot_raincloud(data, name, path):
     n_maps = len(data) + 1
     n_conds, n_metrics, n_subjs, n_imgs = data[0].dims_map.human_arr.shape
-    data_arr = np.empty(shape=(n_maps, n_metrics, n_subjs, n_imgs))
+    data_arr = np.empty(shape=(n_maps, n_metrics, n_subjs, n_imgs*n_conds))
     data_arr.fill(np.nan)
 
     for map_idx in range(n_maps):
         # avg across conditions
         if map_idx == 0:
-            data_arr[0] = data[map_idx].dims_map.human_arr.mean(axis=0)
+            data_arr[0] = data[map_idx].dims_map.human_arr.transpose(1, 2, 0, 3).reshape(n_metrics, n_subjs, n_imgs*n_conds if n_conds > 1 else n_imgs)
         else:
             try:
-                data_arr[map_idx] = data[map_idx-1].dims_map.model_arr.mean(axis=0)
+                data_arr[map_idx] = data[map_idx-1].dims_map.model_arr.transpose(1, 2, 0, 3).reshape(n_metrics, n_subjs, n_imgs*n_conds if n_conds > 1 else n_imgs)
             except ValueError:
-                data_arr[map_idx, :2] = data[map_idx-1].dims_map.model_arr.mean(axis=0)
+                data_arr[map_idx, :2] = data[map_idx-1].dims_map.model_arr.transpose(1, 2, 0, 3).reshape(2, n_subjs, n_imgs*n_conds if n_conds > 1 else n_imgs)
+
+    plot_wasserstein(data_arr, name, path)
 
     data_arr = np.nanmean(data_arr, axis = 3) # average across trials
     # normalized confidence and rt by average before plotting
