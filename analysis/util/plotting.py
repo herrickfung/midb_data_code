@@ -27,7 +27,6 @@ def plot_wasserstein(data, name, path):
         for met_idx in range(n_metrics):
             specs = []
             for i, j in combinations(range(n_subjs), 2):
-                # dist = np.abs(data[map_idx, met_idx, i] - data[map_idx, met_idx, j])
                 dist = wasserstein_distance(
                     data[map_idx, met_idx, i],
                     data[map_idx, met_idx, j]
@@ -39,79 +38,29 @@ def plot_wasserstein(data, name, path):
     print(dists.mean(axis=2))
     print(dists.std(axis=2))
 
-    if name == 'ecoset10' or name == 'mnist':
-        model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
-        colors = plt.cm.get_cmap('Set1', 8)
-    elif name == 'imagenet':
-        model_labels = ['Human', 'AlexNet', 'ResNet18']
-        colors = plt.cm.get_cmap('Set1', 8)
-        colors = tuple(colors(i) for i in [0, 2, 3])
-        colors = ListedColormap(colors)
-
     plt.clf()
-    if name == 'mnist' or name == 'ecoset10':
-        figure, ax = plt.subplots(1, n_metrics, figsize=(8, 3))
-    else:
-        figure, ax = plt.subplots(1, n_metrics, figsize=(5, 3))
-    met_titles = ['Accuracy', 'Confidence', 'RT']
+    plt.figure(figsize=(5, 3))
+    colors = plt.cm.get_cmap('Set1', 8)
+    plt.xticks([1.2, 5.2, 8.4],
+               ['Accuracy', 'Confidence', 'RT'],
+               fontsize=12)
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
 
-    for met_idx in range(n_metrics):
-        plot_data = []
-        plot_labels = []
-        for map_idx in range(n_maps):
-            if met_idx == 2 and map_idx > 1:
-                continue
-            plot_data.extend(dists[map_idx, met_idx])
-            plot_labels.extend([model_labels[map_idx]] * len(dists[map_idx, met_idx]))
-        df_plot = pd.DataFrame({'value': plot_data, 'model': plot_labels})
-
-        # Raincloud plot: violin + strip
-        sns.violinplot(
-            y='model',
-            x='value',
-            data=df_plot,
-            ax=ax[met_idx],
-            inner=None,
-            palette=list(colors.colors) if hasattr(colors, 'colors') else colors.colors,
-            alpha=0.5,
-            linewidth=0
-        )
-
-        for collection in ax[met_idx].collections:
-            _paths = collection.get_paths()[0]
-            vertices = _paths.vertices
-            mean_y = vertices[:, 1].mean()
-            vertices[vertices[:, 1] > mean_y, 1] = mean_y  # clip below mean y
-
-        sns.pointplot(
-            y='model',
-            x='value',
-            data=df_plot,
-            ax=ax[met_idx],
-            join=False,              # Don't connect the points
-            ci='sd',                 # Show standard deviation as error bars
-            color='black',           # Color of points and bars
-            errwidth=1.5,            # Width of error bars
-            markers='D',              # Marker style 'D' for diamond
-            markersize=2
-        )
-
-        ax[met_idx].set_ylabel("", fontsize=6)
-        ax[met_idx].set_title(met_titles[met_idx], fontsize=10, fontweight='bold')
-        ax[met_idx].tick_params(axis='y', labelsize=6)
-        ax[met_idx].tick_params(axis='x', labelsize=6)
-        ax[met_idx].spines['top'].set_visible(False)
-        ax[met_idx].spines['right'].set_visible(False)
-        ax[met_idx].spines['left'].set_visible(False)
-        ax[met_idx].set_xlabel('Pairwise Wasserstein distance', fontsize=8, fontweight='bold')
-
-        if met_idx < 2:
-            ax[met_idx].set_yticks([x for x in range(n_maps)])
-            ax[met_idx].set_yticklabels(model_labels, fontsize=8)
-        else:
-            ax[met_idx].set_yticks([x for x in range(2)])
-            ax[met_idx].set_yticklabels(model_labels[:2], fontsize=8)
-
+    for map_idx in range(n_maps):
+        for met_idx in range(n_metrics):
+            x_pos = met_idx * 4 + map_idx * 0.8
+            plt.bar(x_pos, np.mean(dists[map_idx, met_idx]),
+                    yerr=np.std(dists[map_idx, met_idx]), alpha=0.5,
+                    color=colors(map_idx), label=model_labels[map_idx] if met_idx == 0 else None
+                    )
+    
+    plt.axhline(0, color='black', linestyle='--', linewidth=1)
+    plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
+    plt.ylabel('Wasserstein distance', fontsize=14)
+    plt.ylim(-0.1, 0.8)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.legend(loc='upper left', fontsize=12, frameon=False)
     plt.tight_layout()
     plt.savefig(f"{path}/wasserstein_{name}.png", dpi=384, transparent=True)
     plt.close()
