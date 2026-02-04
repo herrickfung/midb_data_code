@@ -36,7 +36,7 @@ source ./venv/bin/activate
 6. pingouin==0.5.5
 7. seaborn==0.13.2
 8. requests==2.32.5
-9. [indimap](https://github.com/herrickfung/IndiMap)==0.1.1
+9. [indimap](https://github.com/herrickfung/indimap)==0.1.1
 
 To install these dependencies, 
 ```bash
@@ -64,7 +64,20 @@ The repository includes the following structure:
 ## Citation
 If you use any materials from this project, please cite:
 
+<!-- Fung, H., Murty, N. A. R., & Rahnev, D. (2026). Individual differences in artificial neural networks capture individual differences in human behavior. -->
 Fung, H., Murty, N. A. R., & Rahnev, D. (2025). Human-like individual differences emerge from random weight initializations in neural networks (p. 2025.10.25.684448). bioRxiv. [https://doi.org/10.1101/2025.10.25.684448](https://doi.org/10.1101/2025.10.25.684448)
+
+```bibtex
+@article{Fung2025HumanLikeID,
+  title   = {Human-like individual differences emerge from random weight initializations in neural networks},
+  author  = {Fung, Herrick and Murty, N. A. R. and Rahnev, Dobromir},
+  journal = {bioRxiv},
+  year    = {2025},
+  pages   = {2025.10.25.684448},
+  doi     = {10.1101/2025.10.25.684448},
+  url     = {https://doi.org/10.1101/2025.10.25.684448}
+}
+```
 
 ---
 
