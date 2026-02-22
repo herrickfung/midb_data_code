@@ -73,12 +73,12 @@ def graph(all_data, path):
         plotting.plot_best_count_distribution(data, expt, path)
         plotting.plot_within_metric_consistency(data, expt, path)
         plotting.plot_across_metric_consistency(data, expt, path)
+        raw_pred = plotting.plot_within_metric_prediction_raw(data, expt, path)
+        plotting.plot_within_metric_prediction_diff(raw_pred, expt, path)
         plotting.plot_pca_shuffle_comparison(data, expt, path)
         plotting.plot_pca_cumulative_evidence_lineplot(data, expt, path)
         plotting.plot_pca_total_variance_comparison(data, expt, path)
         plotting.plot_pca_total_variance_comparison_split_graph(data, expt, path)
-        raw_pred = plotting.plot_within_metric_prediction_raw(data, expt, path)
-        plotting.plot_within_metric_prediction_diff(raw_pred, expt, path)
 
 
 def main():

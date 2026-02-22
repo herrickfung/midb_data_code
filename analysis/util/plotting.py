@@ -41,23 +41,43 @@ def plot_wasserstein(data, name, path):
     plt.clf()
     plt.figure(figsize=(5, 3))
     colors = plt.cm.get_cmap('Set1', 8)
-    plt.xticks([1.2, 5.2, 8.4],
-               ['Accuracy', 'Confidence', 'RT'],
-               fontsize=12)
     model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
 
     for map_idx in range(n_maps):
         for met_idx in range(n_metrics):
             x_pos = met_idx * 4 + map_idx * 0.8
-            plt.bar(x_pos, np.mean(dists[map_idx, met_idx]),
-                    yerr=np.std(dists[map_idx, met_idx]), alpha=0.5,
-                    color=colors(map_idx), label=model_labels[map_idx] if met_idx == 0 else None
-                    )
-    
+            box = plt.boxplot(dists[map_idx, met_idx], positions=[x_pos], widths=0.6, patch_artist=True,
+                        showfliers=False)
+            # Box fill + edge
+            for patch in box['boxes']:
+                patch.set_facecolor(colors(map_idx))
+                patch.set_alpha(0.5)
+                patch.set_linewidth(0)
+
+            # Whiskers
+            for whisker in box['whiskers']:
+                whisker.set_color(colors(map_idx))
+                whisker.set_linewidth(2.5)
+                whisker.set_alpha(1)
+
+            # Caps
+            for cap in box['caps']:
+                cap.set_color(colors(map_idx))
+                cap.set_linewidth(2.5)
+                cap.set_alpha(1)
+
+            # Median
+            for median in box['medians']:
+                median.set_color(colors(map_idx))
+                median.set_linewidth(2.5)
+                median.set_alpha(1)
+
+    plt.xticks([1.2, 5.2, 8.4],
+               ['Accuracy', 'Confidence', 'RT'],
+               fontsize=12)
     plt.axhline(0, color='black', linestyle='--', linewidth=1)
     plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
     plt.ylabel('Wasserstein distance', fontsize=14)
-    plt.ylim(-0.1, 0.8)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.legend(loc='upper left', fontsize=12, frameon=False)
@@ -311,7 +331,10 @@ def plot_raw_matrix(data, name, path):
 
 def plot_alignment_average(data, name, path):
     plot_avg_data = data.copy()
-    plt.figure(figsize=(5, 4))
+    if name == 'mnist':
+        plt.figure(figsize=(5, 4))
+    else:
+        plt.figure(figsize=(6, 4))
     colors = plt.cm.get_cmap('Set1', 8)
     n_maps, n_metrics, n_subjs, _ = plot_avg_data.shape
 
@@ -320,10 +343,6 @@ def plot_alignment_average(data, name, path):
                 'Human-AlexNet',
                 'Human-ResNet18',
                 ]
-    plt.xticks([1.2, 5.2, 8.4], 
-                ['Accuracy', 'Confidence', 'RT'],
-                fontsize=12
-                )
     plt.ylim(-0.05, 0.9)
     plt.xlim(-1.5, 10.5)
     # y_poss = [0.15, 0.15, 0.15]
@@ -340,12 +359,36 @@ def plot_alignment_average(data, name, path):
             avg_data = np.nanmean(plot_avg_data[map, met, :, :], axis=1)
             print(map, met)
             print(np.nanmean(avg_data))
-            plt.bar(x_pos, np.nanmean(avg_data),
-                    yerr=sem(avg_data), alpha=0.5,
-                    color=colors(map), label=map_labels[map] if met == 0 else None
-                    )
+
+            box = plt.boxplot(avg_data, positions=[x_pos], widths=0.4, patch_artist=True,
+                              showfliers=False)
+
+            # Box fill + edge
+            for patch in box['boxes']:
+                patch.set_facecolor(colors(map))
+                patch.set_alpha(0.5)
+                patch.set_linewidth(0)
+
+            # Whiskers
+            for whisker in box['whiskers']:
+                whisker.set_color(colors(map))
+                whisker.set_linewidth(2.5)
+                whisker.set_alpha(1)
+
+            # Caps
+            for cap in box['caps']:
+                cap.set_color(colors(map))
+                cap.set_linewidth(2.5)
+                cap.set_alpha(1)
+
+            # Median
+            for median in box['medians']:
+                median.set_color(colors(map))
+                median.set_linewidth(2.5)
+                median.set_alpha(1)
+                
             for subj in range(n_subjs):
-                plt.scatter(x_pos-0.25, avg_data[subj], color=colors(map), alpha=0.75, s = 10)
+                plt.scatter(x_pos-0.3, avg_data[subj], color=colors(map), alpha=0.75, s = 10)
 
     stat_data = stat_func.r2z(plot_avg_data, metric='pearson')
     for map in range(n_maps):
@@ -375,6 +418,10 @@ def plot_alignment_average(data, name, path):
                 plt.plot([met * 4, met * 4 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
                 plt.annotate(anno, (x_mid, y_max+0.01), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
 
+    plt.xticks([1.2, 5.2, 8.4], 
+                ['Accuracy', 'Confidence', 'RT'],
+                fontsize=12
+                )
     plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
     plt.ylabel('Correlation coefficient', fontsize=14)
     plt.gca().spines['top'].set_visible(False)
@@ -407,7 +454,12 @@ def plot_alignment_variance(data, name, path):
     results = results.reshape(n_maps, n_boots * n_splits, n_metrics, n_subjs)
 
     plt.clf()
-    fig, ax = plt.subplots(1, 1, figsize=(5, 4))
+    if name == 'mnist':
+        fig, ax = plt.subplots(1, 1, figsize=(5, 4))
+        plt.ylim(0, 0.3)
+    else:
+        fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+        plt.ylim(0, 0.25)
     colors = plt.cm.get_cmap('Set1', 8)
 
     map_labels = ['Human-Human',
@@ -415,23 +467,41 @@ def plot_alignment_variance(data, name, path):
                 'Human-AlexNet',
                 'Human-ResNet18'
                 ]
-    plt.xticks([1.2, 5.2, 8.4], 
-                ['Accuracy', 'Confidence', 'RT'],
-                fontsize=12
-                )
 
     for map in range(n_maps):
         for met in range(n_metrics):
             x_pos = met * 4 + map * 0.8
             avg = np.mean(results[map, :,  met], axis=0)
-            ax.bar(x_pos,
-                    np.mean(avg),
-                    yerr=sem(avg),
-                    color=colors(map), label=map_labels[map] if met == 0 else None,
-                    alpha = 0.5,
-                    )
+            box = plt.boxplot(avg, positions=[x_pos], widths=0.4, patch_artist=True,
+                                showfliers=False)
+
+            # Box fill + edge
+            for patch in box['boxes']:
+                patch.set_facecolor(colors(map))
+                patch.set_alpha(0.5)
+                patch.set_linewidth(0)
+
+            # Whiskers
+            for whisker in box['whiskers']:
+                whisker.set_color(colors(map))
+                whisker.set_linewidth(2.5)
+                whisker.set_alpha(1)
+
+            # Caps
+            for cap in box['caps']:
+                cap.set_color(colors(map))
+                cap.set_linewidth(2.5)
+                cap.set_alpha(1)
+
+            # Median
+            for median in box['medians']:
+                median.set_color(colors(map))
+                median.set_linewidth(2.5)
+                median.set_alpha(1)
+
+
             for subj in range(n_subjs):
-                plt.scatter(x_pos-0.25, avg[subj], color=colors(map), alpha=0.75, s = 10)
+                plt.scatter(x_pos-0.3, avg[subj], color=colors(map), alpha=0.75, s = 10)
 
     var_p_values = np.empty((n_metrics, n_maps, n_maps))
     for met in range(n_metrics):
@@ -458,9 +528,13 @@ def plot_alignment_variance(data, name, path):
                 plt.plot([met * 4, met * 4 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
                 plt.annotate(anno, (x_mid, y_max+0.001), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
 
+    plt.xticks([1.2, 5.2, 8.4], 
+                ['Accuracy', 'Confidence', 'RT'],
+                fontsize=12
+                )
+    plt.xlim(-1.5, 10.5)
     plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
     plt.ylabel('Standard deviation', fontsize=14)
-    plt.ylim(0, 0.325)
     # plt.title('Variance', fontsize=16, fontweight='bold')  
     if name == 'mnist':
         plt.legend(loc='upper right', fontsize=10, frameon=False)
@@ -540,35 +614,55 @@ def plot_across_metric_illustration(data, name, path):
     fig.savefig(path / f'corr_btw_var_illustration_{name}.png', dpi=384, transparent=True)
     plt.close()
 
-    plt.figure(figsize=(5, 3.333))
-    if name == 'mnist' or name == 'ecoset10':
-        plt.xticks([1.2, 5.4, 10.4], 
-                    ['Acc-Conf', 'Acc-RT', 'Conf-RT'],
-                    fontsize=12
-                    )
+    if name == 'mnist':
+        plt.figure(figsize=(4.5, 3))
     else:
-        plt.xticks([0.8], 
-                    ['Accuracy\nConfidence'],
-                    fontsize=12
-                    )
+        plt.figure(figsize=(4, 4))
 
     for i in range(n_maps):
         for j, (met1, met2) in enumerate(combinations(range(n_metrics), 2)):
             if i > 1 and j > 0:
                 continue
-            x_pos = j * 5 + i * 0.8
-            plt.bar(x_pos, np.nanmean(corr_consistency[i, j]),
-                    yerr=sem(corr_consistency[i, j]), alpha=0.5,
-                    color=colors(i), label=model_labels[i] if j == 0 else None
-            )
+            if j < 2:
+                x_pos = j * 4 + i * 0.8
+            else:
+                x_pos = j * 3.2 + i * 0.8
+
+            box = plt.boxplot(corr_consistency[i, j], positions=[x_pos], widths=0.4, patch_artist=True,
+                                showfliers=False)
+
+            # Box fill + edge
+            for patch in box['boxes']:
+                patch.set_facecolor(colors(i))
+                patch.set_alpha(0.5)
+                patch.set_linewidth(0)
+
+            # Whiskers
+            for whisker in box['whiskers']:
+                whisker.set_color(colors(i))
+                whisker.set_linewidth(2.5)
+                whisker.set_alpha(1)
+
+            # Caps
+            for cap in box['caps']:
+                cap.set_color(colors(i))
+                cap.set_linewidth(2.5)
+                cap.set_alpha(1)
+
+            # Median
+            for median in box['medians']:
+                median.set_color(colors(i))
+                median.set_linewidth(2.5)
+                median.set_alpha(1)
+
             for subj in range(n_subj):
                 if subj == best_match and indicate_best_match:
                     color='black'
-                    plt.scatter(x_pos-0.25, corr_consistency[i, j, subj], color=color, alpha=1, s = 50, zorder=2, marker='*',
+                    plt.scatter(x_pos-0.3, corr_consistency[i, j, subj], color=color, alpha=1, s = 50, zorder=2, marker='*',
                                 label='Illustrated subject' if i == 0 and j == 0 else None)
                 else:
                     color = colors(i)
-                    plt.scatter(x_pos-0.25, corr_consistency[i, j, subj], color=color, alpha=0.75, s = 10,
+                    plt.scatter(x_pos-0.3, corr_consistency[i, j, subj], color=color, alpha=0.75, s = 10,
                                 edgecolor='none')
 
     consistency_stat_data = stat_func.r2z(corr_consistency, metric='pearson')  # Convert to z-scores
@@ -589,13 +683,19 @@ def plot_across_metric_illustration(data, name, path):
                 if p_val < 0.001:
                     power = int(np.floor(np.log10(p_val)))
                     coefficient = p_val / (10 ** power)
-                    p_val = r"{:.2f} \times 10^{{{}}}".format(coefficient, power)
+                    anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
                 else:
-                    p_val = r"{:.3f}".format(p_val)
-                x_mid = (k * 5 + k * 5 + j * 0.8) / 2  # Midpoint between bars
-                y_max = np.nanmax(corr_consistency[:, k]) + 0.15 * j
-                plt.plot([k * 5, k * 5 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=1)
-                plt.annotate(rf"$p = {p_val}$", (x_mid, y_max+0.02), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=1)
+                    anno = r"$p = {:.3f}$".format(p_val)
+                if k < 2:
+                    x_mid = (k * 4 + i * 0.8 + k * 4 + j * 0.8) / 2  # Midpoint between bars
+                    plot_x_pos = [k * 4, k * 4 + j * 0.8]
+                else:
+                    x_mid = (k * 3.2 + i * 0.8 + k * 3.2 + j * 0.8) / 2  # Midpoint between bars
+                    plot_x_pos = [k * 3.2, k * 3.2 + j * 0.8]
+                y_max = np.nanmax(corr_consistency[:, k]) + 0.2 * j
+                plt.plot(plot_x_pos, [y_max, y_max], color='black', linewidth=1.5, alpha=1)
+                plt.annotate(anno, (x_mid, y_max+0.02), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=1)
+                plt.ylim(-0.4, 1.95)
 
             if name == 'ecoset10':
                 one_sample_stats = stats.ttest_1samp(consistency_stat_data[j, k], 0)
@@ -607,8 +707,13 @@ def plot_across_metric_illustration(data, name, path):
                     if k != 0 and not (j == 1):
                         continue
                 p_val = one_sample_stats.pvalue
-                x_pos = k * 5 + j * 0.8 + 0.15
-                y_max = -0.1
+
+                if k < 2:
+                    x_pos = (k * 4 + j * 0.8)
+                else:
+                    x_pos = (k * 3.2 + j * 0.8)
+
+                y_max = -0.325
                 if p_val < 1e-3:
                     anno = '***'
                     alpha = 1
@@ -621,16 +726,22 @@ def plot_across_metric_illustration(data, name, path):
                 else:
                     anno = 'n.s.'
                     alpha = 0.5
-                plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha, fontweight='bold')
+                plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha, fontweight='bold')
+                plt.ylim(-0.35, 0.9)
 
-
-    plt.ylim(-0.4, 2.2)
+    plt.xticks([1.2, 4.4, 6.8], 
+                ['Acc-Conf', 'Acc-RT', 'Conf-RT'],
+                fontsize=12
+                )
+    plt.xlim(-1, 8.5)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
     plt.xlabel('Across-metric alignment', fontsize=14, fontweight='bold')
     plt.ylabel('Correlation coefficient', fontsize=14)
+    plt.title('Across-metric alignment', fontsize=14, fontweight='bold')
 
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
-    plt.legend(loc='upper right', fontsize=8, frameon=False)
+    # plt.legend(loc='upper right', fontsize=8, frameon=False)
     plt.tight_layout()
     plt.savefig(path / f'corr_btw_var_correlation_{name}.png', dpi=384, transparent=True)
     plt.close()
@@ -730,23 +841,41 @@ def plot_within_metric_consistency(data, name, path):
     model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
     map_labels = [f'Human-{label}' for label in model_labels]
     colors = plt.cm.get_cmap('Set1', 8)
-    plt.xticks([1.2, 5.2, 8.4], 
-                ['Accuracy', 'Confidence', 'RT'],
-                fontsize=12
-            )
 
     plot_data_in_r = stat_func.z2r(plot_data, metric='pearson') 
     for map in range(n_maps):
         for met in range(n_metrics):
             x_pos = met * 4 + map * 0.8
-            plt.bar(x_pos,
-                np.nanmean(plot_data_in_r[map,met, :]),
-                yerr=sem(plot_data_in_r[map,met,:]),
-                color=colors(map), label=map_labels[map] if met == 0 else None,
-                alpha = 0.5
-                )
+            box = plt.boxplot(plot_data_in_r[map, met, :], positions=[x_pos], widths=0.4, patch_artist=True,
+                              showfliers=False,
+                        )
+
+            # Box fill + edge
+            for patch in box['boxes']:
+                patch.set_facecolor(colors(map))
+                patch.set_alpha(0.5)
+                patch.set_linewidth(0)
+
+            # Whiskers
+            for whisker in box['whiskers']:
+                whisker.set_color(colors(map))
+                whisker.set_linewidth(2.5)
+                whisker.set_alpha(1)
+
+            # Caps
+            for cap in box['caps']:
+                cap.set_color(colors(map))
+                cap.set_linewidth(2.5)
+                cap.set_alpha(1)
+
+            # Median
+            for median in box['medians']:
+                median.set_color(colors(map))
+                median.set_linewidth(2.5)
+                median.set_alpha(1)
+
             for k in range(n_subjs):
-                plt.scatter(x_pos - 0.25,
+                plt.scatter(x_pos - 0.3,
                             plot_data_in_r[map, met, k],
                             color=colors(map), s=5
                             )
@@ -812,7 +941,7 @@ def plot_within_metric_consistency(data, name, path):
                         if met == 2 and not (map_labels[i] == 'Human-Human' and map_labels[j] == 'Human-RTNet'):
                             continue
                         x_pos = (met * 4 + j * 0.8) + 0.15
-                        y_max = -0.04
+                        y_max = -0.2
                         if p_val < 1e-3:
                             anno = '***'
                             alpha = 1
@@ -828,7 +957,12 @@ def plot_within_metric_consistency(data, name, path):
                         plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha, fontweight='bold')
                         plt.legend(loc='upper left', fontsize=8, frameon=False)
 
-
+    plt.xticks([1.2, 5.2, 8.4], 
+                ['Accuracy', 'Confidence', 'RT'],
+                fontsize=12
+            )
+    plt.xlim(-1, 10)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
     plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
     plt.ylabel(r'$r_{same\ subject} - r_{other\ subjects}$ ', fontsize=12, fontweight='bold')
     plt.title('Correlation consistency', fontsize=16, fontweight='bold')
@@ -856,10 +990,6 @@ def plot_within_metric_consistency(data, name, path):
     plt.clf()
     plt.figure(figsize=(5, 4))
 
-    plt.xticks([1.2, 5.2, 8.4], 
-                ['Accuracy', 'Confidence', 'RT'],
-                fontsize=12
-            )
     p_bar_pos = 15
     p_val_pos = 2
 
@@ -868,12 +998,33 @@ def plot_within_metric_consistency(data, name, path):
             x_pos = met * 4 + map * 0.8
             if map > 1 and met > 1:
                 continue
-            plt.bar(x_pos,
-                np.nanmean(plot_data[map,:,met]),
-                yerr=sem(plot_data[map,:, met]),
-                color=colors(map), label=map_labels[map] if met == 0 else None,
-                alpha = 0.5
-                )
+            box = plt.boxplot(plot_data[map, :, met], positions=[x_pos], widths=0.4, patch_artist=True,
+                              showfliers=False,
+                        )
+
+            # Box fill + edge
+            for patch in box['boxes']:
+                patch.set_facecolor(colors(map))
+                patch.set_alpha(0.5)
+                patch.set_linewidth(0)
+
+            # Whiskers
+            for whisker in box['whiskers']:
+                whisker.set_color(colors(map))
+                whisker.set_linewidth(2.5)
+                whisker.set_alpha(1)
+
+            # Caps
+            for cap in box['caps']:
+                cap.set_color(colors(map))
+                cap.set_linewidth(2.5)
+                cap.set_alpha(1)
+
+            # Median
+            for median in box['medians']:
+                median.set_color(colors(map))
+                median.set_linewidth(2.5)
+                median.set_alpha(1)
 
     # compute stats using bootstrapping test
     if name == 'mnist':
@@ -893,7 +1044,7 @@ def plot_within_metric_consistency(data, name, path):
                 if met == 2 and not (map == 1):
                     continue
                 x_mid = (met * 4 + met * 4 + map * 0.8) / 2  # Midpoint between bars
-                y_max = max(np.nanmax(plot_data[:, :, met]), np.nanmax(plot_data[:, :, met])) - 30 + 20 * map
+                y_max = max(np.nanmax(plot_data[:, :, met]), np.nanmax(plot_data[:, :, met])) - 18 + 20 * map
                 # y_max = np.nanmean(plot_data[:, :, met]) + p_bar_pos * abs(map - 0)
                 if p_val < 0.05:
                     alpha = 0.5
@@ -922,7 +1073,7 @@ def plot_within_metric_consistency(data, name, path):
                 if met == 2 and not (_map == 1):
                     continue
                 x_pos = (met * 4 + _map * 0.8)
-                y_max = -0.02
+                y_max = np.nanpercentile(plot_data[_map, :, met], 0) - 10
                 if p_val < 1e-3:
                     anno = '***'
                     alpha = 1
@@ -936,7 +1087,13 @@ def plot_within_metric_consistency(data, name, path):
                     anno = 'n.s.'
                     alpha = 0.5
                 plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha, fontweight='bold')  
+                plt.ylim(-24, 180)
 
+
+    plt.xticks([1.2, 5.2, 8.4], 
+                ['Accuracy', 'Confidence', 'RT'],
+                fontsize=12
+            )
     plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
     plt.ylabel('Rank consistency metric', fontsize=12)
     plt.title('Rank consistency', fontsize=16, fontweight='bold')  
@@ -977,28 +1134,50 @@ def plot_across_metric_consistency(data, name, path):
     plot_data = np.squeeze(plot_data, axis = 0)
 
     plt.clf()
-    plt.figure(figsize=(5, 4))
+    plt.figure(figsize=(4, 4))
 
     model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
     map_labels = [f'Human-{label}' for label in model_labels]
     colors = plt.cm.get_cmap('Set1', 8)
-    plt.xticks([1.2, 5.4, 10.4], 
-                ['Acc-Conf', 'Acc-RT', 'Conf-RT'],
-                fontsize=12
-            )
 
     plot_data_in_r = stat_func.z2r(plot_data, metric='pearson') 
     for map in range(n_maps):
         for met in range(n_metrics):
-            x_pos = met * 5 + map * 0.8
-            plt.bar(x_pos,
-                np.nanmean(plot_data_in_r[map,met, :]),
-                yerr=sem(plot_data_in_r[map,met,:]),
-                color=colors(map), label=map_labels[map] if met == 0 else None,
-                alpha = 0.5
-                )
+            if met < 2:
+                x_pos = met * 4 + map * 0.8
+            else:
+                x_pos = met * 3.2 + map * 0.8
+
+            box = plt.boxplot(plot_data_in_r[map, met, :], positions=[x_pos], widths=0.4, patch_artist=True,
+                        showfliers=False,
+                        ) 
+
+            # Box fill + edge
+            for patch in box['boxes']:
+                patch.set_facecolor(colors(map))
+                patch.set_alpha(0.5)
+                patch.set_linewidth(0)
+
+            # Whiskers
+            for whisker in box['whiskers']:
+                whisker.set_color(colors(map))
+                whisker.set_linewidth(2.5)
+                whisker.set_alpha(1)
+
+            # Caps
+            for cap in box['caps']:
+                cap.set_color(colors(map))
+                cap.set_linewidth(2.5)
+                cap.set_alpha(1)
+
+            # Median
+            for median in box['medians']:
+                median.set_color(colors(map))
+                median.set_linewidth(2.5)
+                median.set_alpha(1)
+
             for k in range(n_subjs):
-                plt.scatter(x_pos - 0.25,
+                plt.scatter(x_pos - 0.3,
                             plot_data_in_r[map, met, k],
                             color=colors(map), s=5
                             )
@@ -1027,8 +1206,14 @@ def plot_across_metric_consistency(data, name, path):
                     if ((map_labels[i] == 'Human-Human')):
                         if met != 0 and not (map_labels[i] == 'Human-Human' and map_labels[j] == 'Human-RTNet'):
                             continue
-                        x_mid = (met * 5 + i * 0.8 + met * 5 + j * 0.8) / 2  # Midpoint between bars
                         y_max = max(np.nanmax(plot_data_in_r[:, met, :]), np.nanmax(plot_data_in_r[:, met, :])) + 0.1 * abs(j - i)
+                        if met < 2:
+                            x_mid = (met * 4 + i * 0.8 + met * 4 + j * 0.8) / 2  # Midpoint between bars
+                            plot_x_pos = [met * 4, met * 4 + j * 0.8]
+                        else:
+                            x_mid = (met * 3.2 + i * 0.8 + met * 3.2 + j * 0.8) / 2  # Midpoint between bars
+                            plot_x_pos = [met * 3.2, met * 3.2 + j * 0.8]
+
                         if p_val < 0.05:
                             alpha = 0.5
                         else:
@@ -1039,10 +1224,9 @@ def plot_across_metric_consistency(data, name, path):
                             anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
                         else:
                             anno = r"$p = {:.3f}$".format(p_val)
-                        plt.plot([met * 5 + i * 0.8, met * 5 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5,alpha=alpha)
-                        plt.plot([met * 5 + i * 0.8, met * 5 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
-                        plt.annotate(anno, (x_mid, y_max+0.02), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha)
-                        plt.ylim(-0.4, 1.3)
+                        plt.plot(plot_x_pos, [y_max, y_max], color='black', linewidth=1.5,alpha=alpha)
+                        plt.annotate(anno, (x_mid, y_max+0.02), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
+                        plt.ylim(-0.4, 1.19)
 
                 if name == 'ecoset10':
                     t_stat, p_val = stats.ttest_1samp(sub_data[j], 0, nan_policy='omit')
@@ -1065,8 +1249,11 @@ def plot_across_metric_consistency(data, name, path):
                     if ((map_labels[i] == 'Human-Human')):
                         if met != 0 and not (map_labels[i] == 'Human-Human' and map_labels[j] == 'Human-RTNet'):
                             continue
-                        x_pos = (met * 5 + j * 0.8) + 0.15
-                        y_max = -0.04
+                        if met < 2:
+                            x_pos = met * 4 + j * 0.8 + 0.15
+                        else: 
+                            x_pos = met * 3.2 + j * 0.8 + 0.15
+                        y_max = -0.18
                         if p_val < 1e-3:
                             anno = '***'
                             alpha = 1
@@ -1082,9 +1269,16 @@ def plot_across_metric_consistency(data, name, path):
                         plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha, fontweight='bold')
                         plt.ylim(-0.25, 0.6)
 
-    plt.xlabel('Pairs of behavioral metrics', fontsize=14, fontweight='bold')
+    plt.xticks([1.2, 4.4, 6.8], 
+                ['Acc-Conf', 'Acc-RT', 'Conf-RT'],
+                fontsize=12
+            )
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlim(-1, 8.5)
+
+    plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
     plt.ylabel(r'$r_{same\ subject} - r_{other\ subjects}$ ', fontsize=12, fontweight='bold')
-    plt.title('Correlation consistency', fontsize=16, fontweight='bold')  
+    plt.title('Correlation consistency', fontsize=14, fontweight='bold')  
     plt.legend(loc='upper right', fontsize=8, frameon=False)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
@@ -1108,26 +1302,48 @@ def plot_across_metric_consistency(data, name, path):
                 plot_data[map_idx] = map_data
 
     plt.clf()
-    plt.figure(figsize=(5, 4))
+    plt.figure(figsize=(4, 4))
 
     p_bar_pos = 10
     p_val_pos = 1
-    plt.xticks([1.2, 5.4, 10.4], 
-                ['Acc-Conf', 'Acc-RT', 'Conf-RT'],
-                fontsize=12
-            )
 
     for map in range(n_maps):
         for met in range(n_metrics):
-            x_pos = met * 5 + map * 0.8
             if met != 0 and not (map <= 1):
                 continue
-            plt.bar(x_pos,
-                np.nanmean(plot_data[map,:,met]),
-                yerr=sem(plot_data[map,:, met]),
-                color=colors(map), label=map_labels[map] if met == 0 else None,
-                alpha = 0.5
-                )
+            if met < 2:
+                x_pos = met * 4 + map * 0.8
+            else:
+                x_pos = met * 3.2 + map * 0.8
+            
+            box = plt.boxplot(plot_data[map, :, met], positions=[x_pos], widths=0.4, patch_artist=True,
+                        showfliers=False,
+                        )
+
+            # Box fill + edge
+            for patch in box['boxes']:
+                patch.set_facecolor(colors(map))
+                patch.set_alpha(0.5)
+                patch.set_linewidth(0)
+
+            # Whiskers
+            for whisker in box['whiskers']:
+                whisker.set_color(colors(map))
+                whisker.set_linewidth(2.5)
+                whisker.set_alpha(1)
+
+            # Caps
+            for cap in box['caps']:
+                cap.set_color(colors(map))
+                cap.set_linewidth(2.5)
+                cap.set_alpha(1)
+
+            # Median
+            for median in box['medians']:
+                median.set_color(colors(map))
+                median.set_linewidth(2.5)
+                median.set_alpha(1)
+            
 
     if name == 'mnist':
         # compute stats using bootstrapping test
@@ -1146,17 +1362,21 @@ def plot_across_metric_consistency(data, name, path):
                     f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
                 if met != 0 and not (map == 1):
                     continue
-                x_mid = (met * 5 + met * 5 + map * 0.8) / 2  # Midpoint between bars
-                y_max = np.nanmax(plot_data[:, :, met]) + p_bar_pos * abs(map - 0) - 20
-                # y_max = np.nanmax(plot_data[:, :, met]) + p_bar_pos * abs(map - 0)
+                if met < 2:
+                    x_mid = (met * 4 + met * 4 + map * 0.8) / 2  # Midpoint between bars
+                    plot_x_pos = [met * 4, met * 4 + map * 0.8]
+                else:
+                    x_mid = (met * 3.2 + met * 3.2 + map * 0.8) / 2  # Midpoint between bars
+                    plot_x_pos = [met * 3.2, met * 3.2 + map * 0.8]
+                # y_max = np.nanmax(plot_data[:, :, met]) + p_bar_pos * abs(map - 0) - 20
+                y_max = np.nanmax(plot_data[:, :, met]) + p_bar_pos * abs(map - 0) * 0.8 - 5
                 alpha = 1
                 if p_val < 0.001:
-                    anno = f'$p$ < 0.001'
+                    anno = r'$p < 0.001$'
                 else:
-                    anno = f'$p$ = {p_val:.3f}'
-                plt.plot([met * 5, met * 5 + map * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
-                plt.annotate(anno, (x_mid, y_max+p_val_pos), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha)
-                plt.ylim(0, 140)
+                    anno = r'$p = {:.3f}$'.format(p_val)
+                plt.plot(plot_x_pos, [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max+p_val_pos), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
 
     if name == 'ecoset10':
         for _map in range(1, n_maps):
@@ -1173,8 +1393,11 @@ def plot_across_metric_consistency(data, name, path):
                     f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
                 if met != 0 and not (_map == 1):
                     continue
-                x_pos = (met * 5 + _map * 0.8)
-                y_max = -0.02
+                if met < 2:
+                    x_pos = (met * 4 + _map * 0.8)
+                else:
+                    x_pos = (met * 3.2 + _map * 0.8)
+                y_max = -5
                 if p_val < 1e-3:
                     anno = '***'
                     alpha = 1
@@ -1187,12 +1410,18 @@ def plot_across_metric_consistency(data, name, path):
                 else:
                     anno = 'n.s.'
                     alpha = 0.5
-                plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha, fontweight='bold')  
-                plt.ylim(0, 100)
+                plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha, fontweight='bold')  
+                plt.ylim(-9, 110)
 
-    plt.xlabel('Pairs of behavioral metrics', fontsize=14, fontweight='bold')
+    plt.xticks([1.2, 4.4, 6.8], 
+                ['Acc-Conf', 'Acc-RT', 'Conf-RT'],
+                fontsize=12
+            )
+    plt.xlim(-1, 8.5)
+
+    plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
     plt.ylabel('Rank consistency metric', fontsize=12)
-    plt.title('Rank consistency', fontsize=16, fontweight='bold')  
+    plt.title('Rank consistency', fontsize=14, fontweight='bold')  
     plt.legend(loc='upper right', fontsize=8, frameon=False)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
@@ -1652,88 +1881,173 @@ def plot_within_metric_prediction_diff(data, name, path):
     plot_data = np.diff(data, axis = 0).squeeze()
     n_maps, n_metrics, n_subjs = plot_data.shape
 
-    plt.clf()
-    plt.figure(figsize=(6, 3))
-    colors = plt.cm.get_cmap('Set1', 8)
-    titles = ['Accuracy', 'Confidence', 'RT']
-
-    if name == 'mnist' or name == 'ecoset10':
+    if name == 'mnist':
+        plt.clf()
+        plt.figure(figsize=(6, 3))
+        colors = plt.cm.get_cmap('Set1', 8)
+        titles = ['Accuracy', 'Confidence', 'RT']
         model_label = ['Subject', 'RTNet', 'AlexNet', 'ResNet18']
-        plt.xticks([1.2, 6.2, 10.4], 
-                    ['Accuracy', 'Confidence', 'RT'],
-                    fontsize=12
-                    )
-    else:
-        model_label = ['Subject', 'AlexNet', 'ResNet18']
-        colors = tuple(colors(i) for i in [0, 2, 3])
-        colors = ListedColormap(colors)
-        plt.xticks([0.8, 5.8], 
-                    ['Accuracy', 'Confidence'],
-                    fontsize=12
-                    )
+        
 
-    for map_ in range(n_maps):
+        for map_ in range(n_maps):
+            for met in range(n_metrics):
+                x_pos = met * 5 + map_ * 0.8
+                box = plt.boxplot(plot_data[map_, met, :], positions=[x_pos], widths=0.6, patch_artist=True,
+                            showfliers=False,
+                            )
+
+                # Box fill + edge
+                for patch in box['boxes']:
+                    patch.set_facecolor(colors(map_))
+                    patch.set_alpha(0.5)
+                    patch.set_linewidth(0)
+
+                # Whiskers
+                for whisker in box['whiskers']:
+                    whisker.set_color(colors(map_))
+                    whisker.set_linewidth(2.5)
+                    whisker.set_alpha(1)
+
+                # Caps
+                for cap in box['caps']:
+                    cap.set_color(colors(map_))
+                    cap.set_linewidth(2.5)
+                    cap.set_alpha(1)
+
+                # Median
+                for median in box['medians']:
+                    median.set_color(colors(map_))
+                    median.set_linewidth(2.5)
+                    median.set_alpha(1)
+
         for met in range(n_metrics):
-            x_pos = met * 5 + map_ * 0.8
-            plt.bar(x_pos,
-                    np.mean(plot_data[map_, met, :]),
-                    yerr=stats.sem(plot_data[map_, met, :]),
-                    color=colors(map_), label=model_label[map_] if met == 0 else None,
+            sub_data = plot_data[:, met, :]
+            for i, j in combinations(range(n_maps), 2):
+                if i != 0:
+                    continue
+                if met == 2 and j > 1:
+                    continue
+
+                data_i = stat_func.r2z(sub_data[i], 'pearson')
+                data_j = stat_func.r2z(sub_data[j], 'pearson')
+                t_stat, p_val = stats.ttest_rel(data_i, data_j)  # average vs corr weight
+                print(f"Metric: {titles[met]}, Map1: {model_label[i]}, Map2: {model_label[j]}, t-value: {t_stat:.4f}, p-value: {p_val}")
+
+                if p_val < 1e-3:
+                    power = int(np.floor(np.log10(p_val)))
+                    coefficient = p_val / (10 ** power)
+                    anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                else:
+                    anno = r"$p = {:.3f}$".format(p_val)
+
+                if p_val < 0.05:
+                    alpha = 1
+                else:
                     alpha = 0.5
-                    )
-            # for k in range(n_subjs):
-            #     plt.scatter(x_pos - 0.25,
-            #                 plot_data[map_, met, k],
-            #                 color=colors(map_), s=5
-            #                 )
 
-    for met in range(n_metrics):
-        sub_data = plot_data[:, met, :]
-        for i, j in combinations(range(n_maps), 2):
-            if i != 0:
-                continue
-            if met == 2 and j > 1:
-                continue
+                x_mid = (met * 5 + i * 0.8 + met * 5 + j * 0.8) / 2  # Midpoint between bars
+                y_max = np.nanpercentile(plot_data[:, met, :], 97.5) + 0.015 * abs(j-i)
+                plt.plot([met * 5 + i * 0.8, met * 5 + j * 0.8], [y_max, y_max], color='black', lw=1, alpha=alpha)
+                plt.annotate(anno, xy=(x_mid, y_max), xytext=(0, 2.5), textcoords='offset points', ha='center', fontsize=8, alpha=alpha)
 
-            data_i = stat_func.r2z(sub_data[i], 'pearson')
-            data_j = stat_func.r2z(sub_data[j], 'pearson')
-            t_stat, p_val = stats.ttest_rel(data_i, data_j)  # average vs corr weight
-            print(f"Metric: {titles[met]}, Map1: {model_label[i]}, Map2: {model_label[j]}, t-value: {t_stat:.4f}, p-value: {p_val}")
+        plt.xticks([1.2, 6.2, 10.4], 
+                        ['Accuracy', 'Confidence', 'RT'],
+                        fontsize=12
+                        )
+        plt.xlabel('Behavioral metrics', fontsize=12, fontweight='bold')
+        plt.ylabel(r'$r_{weighted} - r_{unweighted}$', fontsize=12)
+        plt.axhline(0, color='black', lw=1, ls='dotted', alpha=0.8)
+        plt.xlim(-1, 15.5)
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
 
-            if p_val < 1e-3:
-                power = int(np.floor(np.log10(p_val)))
-                coefficient = p_val / (10 ** power)
-                anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
-            else:
-                anno = r"$p = {:.3f}$".format(p_val)
+        # plt.title('Within-metric prediction', fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        path_name = path / f'pred_wn_var_diff_{name}.png'
+        plt.savefig(path_name, dpi=384, transparent=True)
+        plt.close()
+    
+    else:
+        plt.clf()
+        fig, ax = plt.subplots(1, n_metrics, figsize=(7, 3))
+        colors = plt.cm.get_cmap('Set1', 8)
+        titles = ['Accuracy', 'Confidence', 'RT']
+        model_label = ['Subject', 'RTNet', 'AlexNet', 'ResNet18']
 
-            if p_val < 0.05:
-                alpha = 1
-            else:
-                alpha = 0.5
+        for map_ in range(n_maps):
+            for met in range(n_metrics):
+                x_pos = map_ * 0.8
+                box = ax[met].boxplot(plot_data[map_, met, :], positions=[x_pos], widths=0.6, patch_artist=True,
+                            showfliers=False,
+                            )
+                # Box fill + edge
+                for patch in box['boxes']:
+                    patch.set_facecolor(colors(map_))
+                    patch.set_alpha(0.5)
+                    patch.set_linewidth(0)
 
-            x_mid = (met * 5 + i * 0.8 + met * 5 + j * 0.8) / 2  # Midpoint between bars
-            if name == 'mnist':
-                y_max = 0.0250 + j * 0.0075 - 0.005
-                plt.ylim(-0.02, 0.05)
-            if name == 'ecoset10':
-                y_max = 0.002 + j * 0.001 - 0.0005
-                if met == 2:
-                    y_max += 0.005
-                plt.ylim(-0.002, 0.01)
-            plt.plot([met * 5 + i * 0.8, met * 5 + j * 0.8], [y_max, y_max], color='black', lw=1, alpha=alpha)
-            plt.annotate(anno, xy=(x_mid, y_max), xytext=(0, 2.5), textcoords='offset points', ha='center', fontsize=8, alpha=alpha)
+                # Whiskers
+                for whisker in box['whiskers']:
+                    whisker.set_color(colors(map_))
+                    whisker.set_linewidth(2.5)
+                    whisker.set_alpha(1)
 
-    plt.xlabel('Behavioral metrics', fontsize=12, fontweight='bold')
-    plt.ylabel(r'$r_{weighted} - r_{unweighted}$', fontsize=12)
-    plt.axhline(0, color='black', lw=1, ls='dotted', alpha=0.8)
-    plt.xlim(-1, 15.5)
-    plt.gca().spines['top'].set_visible(False)
-    plt.gca().spines['right'].set_visible(False)
+                # Caps
+                for cap in box['caps']:
+                    cap.set_color(colors(map_))
+                    cap.set_linewidth(2.5)
+                    cap.set_alpha(1)
 
-    plt.legend(loc='upper right', fontsize=10, frameon=False)
-    plt.title('Within-metric prediction', fontsize=14, fontweight='bold')
-    plt.tight_layout()
-    path_name = path / f'pred_wn_var_diff_{name}.png'
-    plt.savefig(path_name, dpi=384, transparent=True)
-    plt.close()
+                # Median
+                for median in box['medians']:
+                    median.set_color(colors(map_))
+                    median.set_linewidth(2.5)
+                    median.set_alpha(1)
+        
+        for met in range(n_metrics):
+            sub_data = plot_data[:, met, :]
+            for i, j in combinations(range(n_maps), 2):
+                if i != 0:
+                    continue
+                if met == 2 and j > 1:
+                    continue
+
+                data_i = stat_func.r2z(sub_data[i], 'pearson')
+                data_j = stat_func.r2z(sub_data[j], 'pearson')
+                t_stat, p_val = stats.ttest_rel(data_i, data_j)  # average vs corr weight
+                print(f"Metric: {titles[met]}, Map1: {model_label[i]}, Map2: {model_label[j]}, t-value: {t_stat:.4f}, p-value: {p_val}")
+
+                if p_val < 1e-3:
+                    power = int(np.floor(np.log10(p_val)))
+                    coefficient = p_val / (10 ** power)
+                    anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                else:
+                    anno = r"$p = {:.3f}$".format(p_val)
+
+                if p_val < 0.05:
+                    alpha = 1
+                else:
+                    alpha = 0.5
+
+                x_mid = (i * 0.8 + j * 0.8) / 2  # Midpoint between bars
+                y_max = np.nanpercentile(plot_data[:, met, :], 95) + 0.0005 * abs(j-i)
+                ax[met].plot([i*0.8, j*0.8], [y_max, y_max], color='black', lw=1, alpha=alpha)
+                ax[met].annotate(anno, xy=(x_mid, y_max), xytext=(0, 2.5), textcoords='offset points', ha='center', fontsize=8, alpha=alpha)
+                ax[met].set_title(f'{titles[met]}', fontsize=10)
+                ax[met].spines['top'].set_visible(False)
+                ax[met].spines['right'].set_visible(False)
+                ax[met].axhline(0, color='black', lw=1, ls='dotted', alpha=0.8)
+                ax[met].tick_params(axis='y', labelsize=6)  
+                ax[met].set_ylabel(r'$r_{weighted} - r_{unweighted}$', fontsize=12) if met == 0 else None
+                if met < 2:
+                    ax[met].set_xticks([0, 0.8, 1.6, 2.4], model_label, fontsize=6)
+                    ax[met].set_xlim(-0.8, 3.2)
+                else:
+                    ax[met].set_xticks([0, 0.8], model_label[:2], fontsize=6)
+                    ax[met].set_xlim(-0.8, 3.2)
+
+        plt.tight_layout()
+        path_name = path / f'pred_wn_var_diff_{name}.png'
+        plt.savefig(path_name, dpi=384, transparent=True)
+        plt.close()
+    
