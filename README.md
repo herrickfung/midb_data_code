@@ -17,6 +17,7 @@ To set up this project locally, follow these steps:
 
 ### 1. System Requirements
 This code was developed and tested on a standard desktop/laptop computer. No specialized hardware (e.g., GPU is required).
+
 This code is supported on *macOS* and *Linux* and has been tested on macOS Ventura (v13.2) and Red Hat Enterprise Linux (RHEL) 8.1, using Python 3.9. The setup instructions and required Python dependencies are listed below.
 
 ### 2. Clone the repository:
