@@ -14,20 +14,25 @@ This project is also presented at NeurIPS 2025 UniReps & Data on the Brain & Min
 
 To set up this project locally, follow these steps:
 
-### 1. Clone the repository:
+
+### 1. System Requirements
+This code was developed and tested on a standard desktop/laptop computer. No specialized hardware (e.g., GPU is required).
+This code is supported on *macOS* and *Linux* and has been tested on macOS Ventura (v13.2) and Red Hat Enterprise Linux (RHEL) 8.1, using Python 3.9. The setup instructions and required Python dependencies are listed below.
+
+### 2. Clone the repository:
 Clone the repository to your local machine and navigate into the project folder:
 ```bash
 git clone https://github.com/herrickfung/midb_data_code.git
 cd midb_data_code
 ```
 
-### 2. Set up a Python environment (optional but recommended)
+### 3. Set up a Python environment (optional but recommended)
 ```bash
 python3 -m venv ./venv/
 source ./venv/bin/activate
 ```
 
-### 3. Install dependencies:
+### 4. Install dependencies:
 1. Python3.9
 2. numpy==2.0.2
 3. pandas==2.2.3
