@@ -2051,3 +2051,126 @@ def plot_within_metric_prediction_diff(data, name, path):
         plt.savefig(path_name, dpi=384, transparent=True)
         plt.close()
     
+
+def plot_within_subject_consistency_in_human(expt, path):
+    from util import dataset
+    if expt == 'mnist':
+        data = dataset.get_human_on_mnist()
+        image_index = 'mnist_index'
+    elif expt == 'ecoset10':
+        data = dataset.get_human_on_ecoset10()
+        image_index = 'image_index'
+
+    results = []
+    for subj, grp in data.groupby('subj'):
+        r0 = grp[grp['reps'] == 0][[image_index, 'resp', 'acc', 'rt', 'conf']]
+        r1 = grp[grp['reps'] == 1][[image_index, 'resp', 'acc', 'rt', 'conf']]
+        merged = pd.merge(r0, r1, on=image_index, suffixes=('_0', '_1'))
+        row = {'subject': subj}
+        for var in ['resp', 'acc', 'rt', 'conf']:
+            row[f'r_{var}'] = merged[f'{var}_0'].corr(merged[f'{var}_1'])
+        results.append(row)
+
+    out = pd.DataFrame(results)
+    metrics = ['acc', 'conf', 'rt', 'resp']
+    metric_labels = ['Accuracy', 'Confidence', 'RT', 'Response']
+    dists = [out[f'r_{m}'].dropna().values for m in metrics]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(3, 3.5))
+
+    for met_idx, vals in enumerate(dists):
+        x_pos = met_idx
+        box = plt.boxplot(vals, positions=[x_pos * 0.8], widths=0.4, patch_artist=True, showfliers=False)
+
+        for patch in box['boxes']:
+            patch.set_facecolor(colors(0))
+            patch.set_alpha(0.5)
+            patch.set_linewidth(0)
+        for whisker in box['whiskers']:
+            whisker.set_color(colors(0))
+            whisker.set_linewidth(2.5)
+        for cap in box['caps']:
+            cap.set_color(colors(0))
+            cap.set_linewidth(2.5)
+        for median in box['medians']:
+            median.set_color(colors(0))
+            median.set_linewidth(2.5)
+
+        for subj_val in vals:
+            plt.scatter(x_pos * 0.8 - 0.3, subj_val, color=colors(0), alpha=0.75, s=10)
+
+    plt.xticks([i * 0.8 for i in range(len(metrics))], metric_labels, fontsize=8.5)
+    plt.xlabel('Behavioral metrics', fontsize=12, fontweight='bold')
+    plt.ylabel(r'r', fontsize=12)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.title(f'{expt.upper()}', fontsize=14, fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig(f'{path}/human_within_subject_consistency_{expt}.png', dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_across_metric_correlation_in_human(expt, path):
+    from util import dataset
+    if expt == 'mnist':
+        data = dataset.get_human_on_mnist()
+        image_index = 'mnist_index'
+    elif expt == 'ecoset10':
+        data = dataset.get_human_on_ecoset10()
+        image_index = 'image_index'
+
+    avg = data.groupby(['subj', image_index])[['acc', 'rt', 'conf']].mean().reset_index()
+
+    # For each subject, correlate averaged metrics image-by-image
+    results = []
+    for subj, grp in avg.groupby('subj'):
+        row = {'subj': subj}
+        row['r_acc_conf'] = grp['acc'].corr(grp['conf'])
+        row['r_acc_rt']   = -grp['acc'].corr(grp['rt'])
+        row['r_conf_rt']  = -grp['conf'].corr(grp['rt'])
+        results.append(row)
+
+    out = pd.DataFrame(results)
+
+    metrics = ['r_acc_conf', 'r_acc_rt', 'r_conf_rt']
+    metric_labels = ['Acc-Conf', 'Acc-RT', 'Conf-RT']
+    dists = [out[m].dropna().values for m in metrics]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(3, 3.5))
+
+    for met_idx, vals in enumerate(dists):
+        box = plt.boxplot(vals, positions=[met_idx * 0.8], widths=0.4, patch_artist=True, showfliers=False)
+
+        for patch in box['boxes']:
+            patch.set_facecolor(colors(0))
+            patch.set_alpha(0.5)
+            patch.set_linewidth(0)
+        for whisker in box['whiskers']:
+            whisker.set_color(colors(0))
+            whisker.set_linewidth(2.5)
+        for cap in box['caps']:
+            cap.set_color(colors(0))
+            cap.set_linewidth(2.5)
+        for median in box['medians']:
+            median.set_color(colors(0))
+            median.set_linewidth(2.5)
+
+        for subj_val in vals:
+            plt.scatter(met_idx * 0.8 - 0.3, subj_val, color=colors(0), alpha=0.75, s=10)
+
+    plt.xticks([i * 0.8 for i in range(len(metrics))], metric_labels, fontsize=10)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1)
+    plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
+    plt.ylabel(r'r', fontsize=14)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.title(f'{expt.upper()}', fontsize=14, fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig(f'{path}/human_across_metric_correlation_{expt}.png', dpi=384, transparent=True)
+    plt.close()

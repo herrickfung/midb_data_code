@@ -51,9 +51,10 @@ def init_map():
 
 def compute(all_maps, load=False):
     """ Compute/load all results """
-    for obj in all_maps:
-        obj.dims_map._convert_data_array()
-        obj.compute_all(load_exists=load)
+    # for obj in all_maps:
+    #     obj.dims_map._convert_data_array()
+    #     obj.compute_all(load_exists=load)
+    pass
 
 
 def graph(all_data, path):
@@ -65,20 +66,23 @@ def graph(all_data, path):
         else:
             data = ecosets
 
-        plotting.plot_raincloud(data, expt, path)
-        map_mat = plotting.plot_raw_matrix(data, expt, path)
-        plotting.plot_alignment_average(map_mat, expt, path)
-        plotting.plot_alignment_variance(data, expt, path)
-        plotting.plot_across_metric_illustration(map_mat, expt, path)
-        plotting.plot_best_count_distribution(data, expt, path)
-        plotting.plot_within_metric_consistency(data, expt, path)
-        plotting.plot_across_metric_consistency(data, expt, path)
-        raw_pred = plotting.plot_within_metric_prediction_raw(data, expt, path)
-        plotting.plot_within_metric_prediction_diff(raw_pred, expt, path)
-        plotting.plot_pca_shuffle_comparison(data, expt, path)
-        plotting.plot_pca_cumulative_evidence_lineplot(data, expt, path)
-        plotting.plot_pca_total_variance_comparison(data, expt, path)
-        plotting.plot_pca_total_variance_comparison_split_graph(data, expt, path)
+        plotting.plot_within_subject_consistency_in_human(expt, path)
+        plotting.plot_across_metric_correlation_in_human(expt, path)
+
+        # plotting.plot_raincloud(data, expt, path)
+        # map_mat = plotting.plot_raw_matrix(data, expt, path)
+        # plotting.plot_alignment_average(map_mat, expt, path)
+        # plotting.plot_alignment_variance(data, expt, path)
+        # plotting.plot_across_metric_illustration(map_mat, expt, path)
+        # plotting.plot_best_count_distribution(data, expt, path)
+        # plotting.plot_within_metric_consistency(data, expt, path)
+        # plotting.plot_across_metric_consistency(data, expt, path)
+        # raw_pred = plotting.plot_within_metric_prediction_raw(data, expt, path)
+        # plotting.plot_within_metric_prediction_diff(raw_pred, expt, path)
+        # plotting.plot_pca_shuffle_comparison(data, expt, path)
+        # plotting.plot_pca_cumulative_evidence_lineplot(data, expt, path)
+        # plotting.plot_pca_total_variance_comparison(data, expt, path)
+        # plotting.plot_pca_total_variance_comparison_split_graph(data, expt, path)
 
 
 def main():

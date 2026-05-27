@@ -32,7 +32,8 @@ def get_human_on_mnist():
     data['rt'] = data['resp_rt']
     data['conf'] = data['confidence']
     data['subj'] = data['subject']
-    data = data.groupby(['mnist_index', 'sat', 'noise', 'subject', 'repeat']).mean(numeric_only=True).reset_index()
+    data['reps'] = data['repeat']
+    data = data.groupby(['mnist_index', 'sat', 'noise', 'subject', 'reps']).mean(numeric_only=True).reset_index()
     data['cond'] = data.apply(determine_condition, axis = 1)
     return data
 
