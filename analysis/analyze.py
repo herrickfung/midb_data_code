@@ -37,24 +37,25 @@ def download_and_extract_data(current_path):
     tar_path.unlink()
 
 
-def init_map():
+def init_map(variant = 'standard'):
     """ Initialize IndiMap objects for all models and datasets """
     return [
-        IndiMap(dataset.get_rtnet_on_mnist()),
-        IndiMap(dataset.get_alexnet_on_mnist()),
-        IndiMap(dataset.get_resnet18_on_mnist()),
-        IndiMap(dataset.get_rtnet_on_ecoset10()),
-        IndiMap(dataset.get_alexnet_on_ecoset10()),
-        IndiMap(dataset.get_resnet18_on_ecoset10()),
+        IndiMap(dataset.get_rtnet_on_mnist(variant)),
+        IndiMap(dataset.get_alexnet_on_mnist(variant)),
+        IndiMap(dataset.get_resnet18_on_mnist(variant)),
+        IndiMap(dataset.get_rtnet_on_ecoset10(variant)),
+        IndiMap(dataset.get_alexnet_on_ecoset10(variant)),
+        IndiMap(dataset.get_resnet18_on_ecoset10(variant)),
     ]
 
 
-def compute(all_maps, load=False):
+def compute(all_maps, variant='standard', load=False):
     """ Compute/load all results """
-    # for obj in all_maps:
-    #     obj.dims_map._convert_data_array()
-    #     obj.compute_all(load_exists=load)
-    pass
+    for obj in all_maps:
+        # obj.dims_map._convert_data_array()
+        obj.compute_corr(load_exists=load)
+        obj.compute_rank(load_exists=load)
+    # pass
 
 
 def graph(all_data, path):
@@ -66,8 +67,8 @@ def graph(all_data, path):
         else:
             data = ecosets
 
-        plotting.plot_within_subject_consistency_in_human(expt, path)
-        plotting.plot_across_metric_correlation_in_human(expt, path)
+        # plotting.plot_within_subject_consistency_in_human(expt, path)
+        # plotting.plot_across_metric_correlation_in_human(expt, path)
 
         # plotting.plot_raincloud(data, expt, path)
         # map_mat = plotting.plot_raw_matrix(data, expt, path)
@@ -75,8 +76,14 @@ def graph(all_data, path):
         # plotting.plot_alignment_variance(data, expt, path)
         # plotting.plot_across_metric_illustration(map_mat, expt, path)
         # plotting.plot_best_count_distribution(data, expt, path)
-        # plotting.plot_within_metric_consistency(data, expt, path)
-        # plotting.plot_across_metric_consistency(data, expt, path)
+
+        plotting.plot_corr_within_metric_consistency(data, expt, path, split_by='rand')
+        plotting.plot_corr_within_metric_consistency(data, expt, path, split_by='cate')
+        plotting.plot_rank_within_metric_consistency(data, expt, path)
+        plotting.plot_corr_across_metric_consistency(data, expt, path, split_by='rand')
+        plotting.plot_corr_across_metric_consistency(data, expt, path, split_by='cate')
+        plotting.plot_rank_across_metric_consistency(data, expt, path)
+
         # raw_pred = plotting.plot_within_metric_prediction_raw(data, expt, path)
         # plotting.plot_within_metric_prediction_diff(raw_pred, expt, path)
         # plotting.plot_pca_shuffle_comparison(data, expt, path)
@@ -94,9 +101,9 @@ def main():
 
     current_path, graph_path = manage_path()
     download_and_extract_data(current_path)
-    all_maps = init_map()
-    compute(all_maps, load=load)
-    graph(all_maps, graph_path)
+    standard_maps = init_map(variant='untrained')
+    compute(standard_maps, variant='untrained', load=load)
+    graph(standard_maps, graph_path)
 
 
 if __name__ == "__main__":

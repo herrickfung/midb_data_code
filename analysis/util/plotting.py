@@ -807,10 +807,10 @@ def plot_best_count_distribution(data, name, path):
     plt.close()
 
 
-def plot_within_metric_consistency(data, name, path):
-    # plot corr consistency
+def plot_corr_within_metric_consistency(data, name, path, split_by):
+       # plot corr consistency
     n_maps = len(data) + 1
-    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'split').mat.shape
+    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'split', split_by=split_by).mat.shape
 
     plot_data = np.empty(shape=(2, n_maps, n_metrics, n_subjs))
     plot_data.fill(np.nan)
@@ -819,14 +819,14 @@ def plot_within_metric_consistency(data, name, path):
         for map_idx in range(n_maps):
             for met_idx in range(n_metrics):
                 if map_idx == 0:
-                    map_data = data[map_idx].get_corr_results('subj', 'subj', map_type, 'split').mat
+                    map_data = data[map_idx].get_corr_results('subj', 'subj', map_type, 'split', split_by=split_by).mat
                     map_data = stat_func.r2z(map_data, metric='pearson')
-                    map_data = np.mean(map_data, axis=0)
+                    map_data = np.nanmean(map_data, axis=0)
                     plot_data[type_idx, map_idx] = map_data
                 else:
-                    map_data = data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'split').mat
+                    map_data = data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'split', split_by=split_by).mat
                     map_data = stat_func.r2z(map_data, metric='pearson')
-                    map_data = np.mean(map_data, axis=0)
+                    map_data = np.nanmean(map_data, axis=0)
                     try:
                         plot_data[type_idx, map_idx] = map_data
                     except ValueError:
@@ -885,7 +885,7 @@ def plot_within_metric_consistency(data, name, path):
         for i in range(sub_data.shape[0]):
             for j in range(i + 1, sub_data.shape[0]):
 
-                if name == 'mnist':
+                if name in ['mnist', 'ecoset10']:
                     t_stat, p_val = stats.ttest_ind(sub_data[i], sub_data[j], equal_var=False, nan_policy='omit')
                     try:
                         bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
@@ -922,7 +922,7 @@ def plot_within_metric_consistency(data, name, path):
                         plt.ylim(-0.4, 1.3)
                         plt.legend(loc='upper right', fontsize=8, frameon=False)
 
-                if name == 'ecoset10':
+                if name in ['mnist', 'ecoset10']:
                     t_stat, p_val = stats.ttest_1samp(sub_data[j], 0, nan_policy='omit')
                     try:
                         bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
@@ -969,9 +969,14 @@ def plot_within_metric_consistency(data, name, path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    path_name = path / f'corr_btw_bs_{name}.png'
+    path_name = path / f'corr_btw_bs_{name}_split_{split_by}.png'
     plt.savefig(path_name, dpi=384, transparent=True)
     plt.close()
+
+
+def plot_rank_within_metric_consistency(data, name, path):
+    n_maps = len(data) + 1
+    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'split').mat.shape
 
     # plot rank consistency
     plot_data = np.empty(shape=(n_maps, n_boots, n_metrics))
@@ -989,6 +994,7 @@ def plot_within_metric_consistency(data, name, path):
 
     plt.clf()
     plt.figure(figsize=(5, 4))
+    colors = plt.cm.get_cmap('Set1', 8)
 
     p_bar_pos = 15
     p_val_pos = 2
@@ -1106,10 +1112,10 @@ def plot_within_metric_consistency(data, name, path):
     plt.close()
 
 
-def plot_across_metric_consistency(data, name, path):
-        # plot corr consistency
+def plot_corr_across_metric_consistency(data, name, path, split_by):
+    # plot corr consistency
     n_maps = len(data) + 1
-    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'var').mat.shape
+    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'var', split_by).mat.shape
 
     plot_data = np.empty(shape=(2, n_maps, n_metrics, n_subjs))
     plot_data.fill(np.nan)
@@ -1117,12 +1123,12 @@ def plot_across_metric_consistency(data, name, path):
     for type_idx, map_type in enumerate(['subj', 'subj_gp']):
         for map_idx in range(n_maps):
             if map_idx == 0:
-                map_data = data[map_idx].get_corr_results('subj', 'subj', map_type, 'var').mat
+                map_data = data[map_idx].get_corr_results('subj', 'subj', map_type, 'var', split_by).mat
                 map_data = stat_func.r2z(map_data, metric='pearson')
                 map_data = np.mean(map_data, axis=0)
                 plot_data[type_idx, map_idx] = map_data
             else:
-                map_data = data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'var').mat
+                map_data = data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'var', split_by).mat
                 map_data = stat_func.r2z(map_data, metric='pearson')
                 map_data = np.mean(map_data, axis=0)
                 if map_idx > 1 and n_metrics > 1:
@@ -1186,7 +1192,7 @@ def plot_across_metric_consistency(data, name, path):
         sub_data = plot_data[:, met, :]
         for i in range(sub_data.shape[0]):
             for j in range(i + 1, sub_data.shape[0]):
-                if name == 'mnist':
+                if name in ['mnist', 'ecoset10']:
                     t_stat, p_val = stats.ttest_ind(sub_data[i], sub_data[j], equal_var=False, nan_policy='omit')
                     try:
                         bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
@@ -1228,7 +1234,7 @@ def plot_across_metric_consistency(data, name, path):
                         plt.annotate(anno, (x_mid, y_max+0.02), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
                         plt.ylim(-0.4, 1.19)
 
-                if name == 'ecoset10':
+                if name in ['mnist', 'ecoset10']:
                     t_stat, p_val = stats.ttest_1samp(sub_data[j], 0, nan_policy='omit')
                     try:
                         bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
@@ -1267,7 +1273,7 @@ def plot_across_metric_consistency(data, name, path):
                             anno = 'n.s.'
                             alpha = 0.5
                         plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha, fontweight='bold')
-                        plt.ylim(-0.25, 0.6)
+                        plt.ylim(-0.4, 1.19)
 
     plt.xticks([1.2, 4.4, 6.8], 
                 ['Acc-Conf', 'Acc-RT', 'Conf-RT'],
@@ -1283,9 +1289,14 @@ def plot_across_metric_consistency(data, name, path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    path_name = path / f'corr_btw_var_{name}.png'
+    path_name = path / f'corr_btw_var_{name}_split_{split_by}.png'
     plt.savefig(path_name, dpi=384, transparent=True)
     plt.close()
+
+
+def plot_rank_across_metric_consistency(data, name, path):
+    n_maps = len(data) + 1
+    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'var').mat.shape
 
     # plot rank consistency
     plot_data = np.empty(shape=(n_maps, n_boots, n_metrics))
@@ -1303,6 +1314,7 @@ def plot_across_metric_consistency(data, name, path):
 
     plt.clf()
     plt.figure(figsize=(4, 4))
+    colors = plt.cm.get_cmap('Set1', 8)
 
     p_bar_pos = 10
     p_val_pos = 1
