@@ -807,6 +807,173 @@ def plot_best_count_distribution(data, name, path):
     plt.close()
 
 
+
+def plot_top_identifiability(data, name, path):
+    n_maps = len(data) + 1
+    _, n_metrics, n_subjs = data[0].get_top_iden('subj', 'inst', 'pair').mat.shape
+
+    plot_data = np.empty(shape=(2, n_maps, n_metrics, n_subjs))
+    plot_data.fill(np.nan)
+
+    for type_idx, map_type in enumerate(['pair', 'gp']):
+        for map_idx in range(n_maps):
+            for met_idx in range(n_metrics):
+                if map_idx == 0:
+                    map_data = data[map_idx].get_top_iden('subj', 'subj', map_type).mat
+                    map_data = stat_func.r2z(map_data, metric='pearson')
+                    map_data = np.nanmean(map_data, axis=0)
+                    plot_data[type_idx, map_idx] = map_data
+                else:
+                    map_data = data[map_idx-1].get_top_iden('subj', 'inst', map_type).mat
+                    map_data = stat_func.r2z(map_data, metric='pearson')
+                    map_data = np.nanmean(map_data, axis=0)
+                    try:
+                        plot_data[type_idx, map_idx] = map_data
+                    except ValueError:
+                        plot_data[type_idx, map_idx, :2] = map_data
+    
+    plot_data = -np.diff(plot_data, axis = 0)
+    plot_data = np.squeeze(plot_data, axis = 0)
+
+    plt.clf()
+    plt.figure(figsize=(5, 4))
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plot_data_in_r = stat_func.z2r(plot_data, metric='pearson') 
+    for map in range(n_maps):
+        for met in range(n_metrics):
+            x_pos = met * 4 + map * 0.8
+            box = plt.boxplot(plot_data_in_r[map, met, :], positions=[x_pos], widths=0.4, patch_artist=True,
+                              showfliers=False,
+                        )
+
+            # Box fill + edge
+            for patch in box['boxes']:
+                patch.set_facecolor(colors(map))
+                patch.set_alpha(0.5)
+                patch.set_linewidth(0)
+
+            # Whiskers
+            for whisker in box['whiskers']:
+                whisker.set_color(colors(map))
+                whisker.set_linewidth(2.5)
+                whisker.set_alpha(1)
+
+            # Caps
+            for cap in box['caps']:
+                cap.set_color(colors(map))
+                cap.set_linewidth(2.5)
+                cap.set_alpha(1)
+
+            # Median
+            for median in box['medians']:
+                median.set_color(colors(map))
+                median.set_linewidth(2.5)
+                median.set_alpha(1)
+
+            for k in range(n_subjs):
+                plt.scatter(x_pos - 0.3,
+                            plot_data_in_r[map, met, k],
+                            color=colors(map), s=5
+                            )
+
+    for met in range(n_metrics):
+        sub_data = plot_data[:, met, :]
+        for i in range(sub_data.shape[0]):
+            for j in range(i + 1, sub_data.shape[0]):
+
+                if name in ['mnist', 'ecoset10']:
+                    t_stat, p_val = stats.ttest_ind(sub_data[i], sub_data[j], equal_var=False, nan_policy='omit')
+                    try:
+                        bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
+                    except Exception:
+                        bayes10 = np.nan
+                    bayes01 = 1 / bayes10
+                    mean_diff = np.nanmean(sub_data[i]) - np.nanmean(sub_data[j])
+                    pooled_std = np.sqrt((np.nanvar(sub_data[i], ddof=1) + np.nanvar(sub_data[j], ddof=1)) / 2)
+                    cohen_d = mean_diff / pooled_std if pooled_std != 0 else np.nan
+                    print(f"Metric: {['Accuracy', 'Confidence', 'Reaction time'][met]}, "
+                        f"Comparison: {map_labels[i]} vs {map_labels[j]} - "
+                        f"t-stat: {t_stat:.4f}, p-value: {p_val:.8f}, "
+                        f"BF10: {bayes10:.4f}, BF01: {bayes01:.4f}, "
+                        f"Cohen's d: {cohen_d:.4f}")
+
+                    # Check for significance
+                    if ((map_labels[i] == 'Human-Human')):
+                        if met == 2 and not (map_labels[i] == 'Human-Human' and map_labels[j] == 'Human-RTNet'):
+                            continue
+                        x_mid = (met * 4 + i * 0.8 + met * 4 + j * 0.8) / 2  # Midpoint between bars
+                        y_max = max(np.nanmax(plot_data_in_r[:, met, :]), np.nanmax(plot_data_in_r[:, met, :])) + 0.1 * abs(j - i)
+                        if p_val < 0.05:
+                            alpha = 0.5
+                        else:
+                            alpha = 1
+                        if p_val < 1e-3:
+                            power = int(np.floor(np.log10(p_val)))
+                            coefficient = p_val / (10 ** power)
+                            anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                        else:
+                            anno = r"$p = {:.3f}$".format(p_val)
+                        plt.plot([met * 4 + i * 0.8, met * 4 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                        plt.annotate(anno, (x_mid, y_max+0.02), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
+                        plt.ylim(-0.3, 0.75)
+                        plt.legend(loc='upper right', fontsize=8, frameon=False)
+
+                if name in ['mnist', 'ecoset10']:
+                    t_stat, p_val = stats.ttest_1samp(sub_data[j], 0, nan_policy='omit')
+                    try:
+                        bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
+                    except Exception:
+                        bayes10 = np.nan
+                    bayes01 = 1 / bayes10
+                    cohen_d = t_stat / np.sqrt(n_subjs) if n_subjs != 0 else np.nan
+                    print(f"Metric: {['Accuracy', 'Confidence', 'Reaction time'][met]}, "
+                        f"Comparison: {map_labels[i]} vs {map_labels[j]} - "
+                        f"t-stat: {t_stat:.4f}, p-value: {p_val:.8f}, "
+                        f"BF10: {bayes10:.4f}, BF01: {bayes01:.4f}, "
+                        f"Cohen's d: {cohen_d:.4f}")
+
+                    # compare to 0 signfiicance
+                    if ((map_labels[i] == 'Human-Human')):
+                        if met == 2 and not (map_labels[i] == 'Human-Human' and map_labels[j] == 'Human-RTNet'):
+                            continue
+                        x_pos = (met * 4 + j * 0.8) + 0.15
+                        y_max = -0.2
+                        if p_val < 1e-3:
+                            anno = '***'
+                            alpha = 1
+                        elif p_val < 0.01:
+                            anno = '**'
+                            alpha = 1
+                        elif p_val < 0.05:
+                            anno = '*'
+                            alpha = 1
+                        else:
+                            anno = 'n.s.'
+                            alpha = 0.5
+                        plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha, fontweight='bold')
+                        plt.legend(loc='upper left', fontsize=8, frameon=False)
+
+    plt.xticks([1.2, 5.2, 8.4], 
+                ['Accuracy', 'Confidence', 'RT'],
+                fontsize=12
+            )
+    plt.xlim(-1, 10)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
+    plt.ylabel(r'$r_{best\ pair} - r_{other\ pairs}$ ', fontsize=12, fontweight='bold')
+    plt.title('Best-pair advantage', fontsize=16, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    path_name = path / f'top_btw_bs_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
 def plot_corr_within_metric_consistency(data, name, path, split_by):
        # plot corr consistency
     n_maps = len(data) + 1
@@ -2186,3 +2353,390 @@ def plot_across_metric_correlation_in_human(expt, path):
     plt.tight_layout()
     plt.savefig(f'{path}/human_across_metric_correlation_{expt}.png', dpi=384, transparent=True)
     plt.close()
+
+
+def _style_control_boxplot(box, color):
+    for patch in box['boxes']:
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
+        patch.set_linewidth(0)
+    for whisker in box['whiskers']:
+        whisker.set_color(color)
+        whisker.set_linewidth(2.5)
+        whisker.set_alpha(1)
+    for cap in box['caps']:
+        cap.set_color(color)
+        cap.set_linewidth(2.5)
+        cap.set_alpha(1)
+    for median in box['medians']:
+        median.set_color(color)
+        median.set_linewidth(2.5)
+        median.set_alpha(1)
+
+
+def plot_corr_within_metric_consistency_accuracy_control(all_maps, sds, path, split_by):
+    """ Accuracy-control counterpart of plot_corr_within_metric_consistency (MNIST only).
+
+    all_maps: list indexed by sd position, each entry a [rtnet, alexnet, resnet18]
+    list of IndiMap objects for that sd. One figure is produced per behavioral
+    metric, with sd on the x-axis and the four Human-X comparisons grouped
+    (and colored) within each sd position.
+    """
+    n_sds = len(all_maps)
+    n_maps = len(all_maps[0]) + 1
+    n_boots, n_metrics, n_subjs = all_maps[0][0].get_corr_results('subj', 'inst', 'subj', 'split', split_by=split_by).mat.shape
+
+    plot_data = np.empty(shape=(2, n_sds, n_maps, n_metrics, n_subjs))
+    plot_data.fill(np.nan)
+
+    for type_idx, map_type in enumerate(['subj', 'subj_gp']):
+        for sd_idx, data in enumerate(all_maps):
+            for map_idx in range(n_maps):
+                if map_idx == 0:
+                    map_data = data[map_idx].get_corr_results('subj', 'subj', map_type, 'split', split_by=split_by).mat
+                    map_data = stat_func.r2z(map_data, metric='pearson')
+                    map_data = np.nanmean(map_data, axis=0)
+                    plot_data[type_idx, sd_idx, map_idx] = map_data
+                else:
+                    map_data = data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'split', split_by=split_by).mat
+                    map_data = stat_func.r2z(map_data, metric='pearson')
+                    map_data = np.nanmean(map_data, axis=0)
+                    try:
+                        plot_data[type_idx, sd_idx, map_idx] = map_data
+                    except ValueError:
+                        plot_data[type_idx, sd_idx, map_idx, :2] = map_data
+
+    plot_data = -np.diff(plot_data, axis=0)
+    plot_data = np.squeeze(plot_data, axis=0)  # (n_sds, n_maps, n_metrics, n_subjs)
+    plot_data_in_r = stat_func.z2r(plot_data, metric='pearson')
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+    sd_labels = [str(sd) if sd != 0 else '0' for sd in sds]
+    met_titles = ['Accuracy', 'Confidence', 'Reaction time']
+    met_fnames = ['acc', 'conf', 'rt']
+
+    for met_idx in range(n_metrics):
+        plt.clf()
+        plt.figure(figsize=(7, 4))
+
+        for sd_idx in range(n_sds):
+            for map_idx in range(n_maps):
+                vals = plot_data_in_r[sd_idx, map_idx, met_idx, :]
+                if np.all(np.isnan(vals)):
+                    continue
+                x_pos = sd_idx * 4 + map_idx * 0.8
+                box = plt.boxplot(vals, positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+                _style_control_boxplot(box, colors(map_idx))
+                for k in range(n_subjs):
+                    plt.scatter(x_pos - 0.3, vals[k], color=colors(map_idx), s=5)
+
+        for sd_idx in range(n_sds):
+            sub_data = plot_data[sd_idx, :, met_idx, :]
+            for map_idx in range(1, n_maps):
+                if np.all(np.isnan(sub_data[map_idx])):
+                    continue
+                t_stat, p_val = stats.ttest_ind(sub_data[0], sub_data[map_idx], equal_var=False, nan_policy='omit')
+                try:
+                    bayes10 = float(pg.ttest(sub_data[0], sub_data[map_idx], paired=False)['BF10'].values[0])
+                except Exception:
+                    bayes10 = np.nan
+                bayes01 = 1 / bayes10
+                print(f"Metric: {met_titles[met_idx]}, SD: {sd_labels[sd_idx]}, "
+                      f"Comparison: {map_labels[0]} vs {map_labels[map_idx]} - "
+                      f"t-stat: {t_stat:.4f}, p-value: {p_val:.6f}, BF10: {bayes10:.4f}, BF01: {bayes01:.4f}")
+
+                x_mid = sd_idx * 4 + map_idx * 0.4
+                y_max = np.nanmax(plot_data_in_r[sd_idx, :, met_idx, :]) + 0.08 * map_idx
+                alpha = 0.5 if p_val < 0.05 else 1
+                if p_val < 1e-3:
+                    power = int(np.floor(np.log10(p_val)))
+                    coefficient = p_val / (10 ** power)
+                    anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                else:
+                    anno = r"$p = {:.3f}$".format(p_val)
+                plt.plot([sd_idx * 4, sd_idx * 4 + map_idx * 0.8], [y_max, y_max], color='black', linewidth=1.2, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=6, alpha=alpha)
+
+                t_stat0, p_val0 = stats.ttest_1samp(sub_data[map_idx], 0, nan_policy='omit')
+                star_x = sd_idx * 4 + map_idx * 0.8
+                star_y = np.nanmin(plot_data_in_r[sd_idx, :, met_idx, :]) - 0.05
+                if p_val0 < 1e-3:
+                    star = '***'
+                elif p_val0 < 0.01:
+                    star = '**'
+                elif p_val0 < 0.05:
+                    star = '*'
+                else:
+                    star = 'n.s.'
+                plt.annotate(star, (star_x, star_y), ha='center', size=8, fontweight='bold',
+                             alpha=1 if p_val0 < 0.05 else 0.5)
+
+        plt.xticks([sd_idx * 4 + 1.2 for sd_idx in range(n_sds)], sd_labels, fontsize=12)
+        plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+        plt.xlabel('Accuracy shift (SD)', fontsize=14, fontweight='bold')
+        plt.ylabel(r'$r_{same\ subject} - r_{other\ subjects}$ ', fontsize=12, fontweight='bold')
+        plt.title(f'Correlation consistency - {met_titles[met_idx]}', fontsize=15, fontweight='bold')
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+        plt.tight_layout()
+        path_name = path / f'corr_btw_bs_accuracy_control_{met_fnames[met_idx]}_split_{split_by}.png'
+        plt.savefig(path_name, dpi=384, transparent=True)
+        plt.close()
+
+
+def plot_rank_within_metric_consistency_accuracy_control(all_maps, sds, path):
+    """ Accuracy-control counterpart of plot_rank_within_metric_consistency (MNIST only). """
+    n_sds = len(all_maps)
+    n_maps = len(all_maps[0]) + 1
+    n_boots, n_metrics, n_subjs = all_maps[0][0].get_corr_results('subj', 'inst', 'subj', 'split').mat.shape
+
+    plot_data = np.empty(shape=(n_sds, n_maps, n_boots, n_metrics))
+    plot_data.fill(np.nan)
+    for sd_idx, data in enumerate(all_maps):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                map_data = data[map_idx].get_rank_results('subj', 'subj', 'split').mat
+                plot_data[sd_idx, map_idx] = map_data
+            else:
+                map_data = data[map_idx-1].get_rank_results('subj', 'inst', 'split').mat
+                try:
+                    plot_data[sd_idx, map_idx] = map_data
+                except ValueError:
+                    plot_data[sd_idx, map_idx, :, :2] = map_data
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+    sd_labels = [str(sd) if sd != 0 else '0' for sd in sds]
+    met_titles = ['Accuracy', 'Confidence', 'Reaction time']
+    met_fnames = ['acc', 'conf', 'rt']
+
+    for met_idx in range(n_metrics):
+        plt.clf()
+        plt.figure(figsize=(7, 4))
+
+        for sd_idx in range(n_sds):
+            for map_idx in range(n_maps):
+                vals = plot_data[sd_idx, map_idx, :, met_idx]
+                if np.all(np.isnan(vals)):
+                    continue
+                x_pos = sd_idx * 4 + map_idx * 0.8
+                box = plt.boxplot(vals, positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+                _style_control_boxplot(box, colors(map_idx))
+
+        for sd_idx in range(n_sds):
+            for map_idx in range(1, n_maps):
+                if np.all(np.isnan(plot_data[sd_idx, map_idx, :, met_idx])):
+                    continue
+                diff = plot_data[sd_idx, 0, :, met_idx] - plot_data[sd_idx, map_idx, :, met_idx]
+                p_val = 2 * min(np.mean(diff >= 0), np.mean(diff < 0))
+                ci_lower = np.percentile(diff, 2.5)
+                ci_upper = np.percentile(diff, 97.5)
+                print(f"Metric: {met_titles[met_idx]}, SD: {sd_labels[sd_idx]}, "
+                      f"Comparison: {map_labels[0]} vs {map_labels[map_idx]} - "
+                      f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
+
+                x_mid = sd_idx * 4 + map_idx * 0.4
+                y_max = np.nanmax(plot_data[sd_idx, :, :, met_idx]) + 15 * map_idx
+                alpha = 0.5 if p_val < 0.05 else 1
+                anno = r'$p < 0.001$' if p_val < 0.001 else r'$p = {:.3f}$'.format(p_val)
+                plt.plot([sd_idx * 4, sd_idx * 4 + map_idx * 0.8], [y_max, y_max], color='black', linewidth=1.2, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=6, alpha=alpha)
+
+        plt.xticks([sd_idx * 4 + 1.2 for sd_idx in range(n_sds)], sd_labels, fontsize=12)
+        plt.xlabel('Accuracy shift (SD)', fontsize=14, fontweight='bold')
+        plt.ylabel('Rank consistency metric', fontsize=12)
+        plt.title(f'Rank consistency - {met_titles[met_idx]}', fontsize=15, fontweight='bold')
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+        plt.tight_layout()
+        path_name = path / f'rank_btw_bs_accuracy_control_{met_fnames[met_idx]}.png'
+        plt.savefig(path_name, dpi=384, transparent=True)
+        plt.close()
+
+
+def plot_corr_across_metric_consistency_accuracy_control(all_maps, sds, path, split_by):
+    """ Accuracy-control counterpart of plot_corr_across_metric_consistency (MNIST only).
+
+    One figure is produced per metric-pair (Acc-Conf, Acc-RT, RT-Conf). AlexNet
+    and ResNet18 lack RT, so their boxes/stats are only ever populated for the
+    Acc-Conf pair (index 0) - handled the same way as the original function.
+    """
+    n_sds = len(all_maps)
+    n_maps = len(all_maps[0]) + 1
+    n_boots, n_pairs, n_subjs = all_maps[0][0].get_corr_results('subj', 'inst', 'subj', 'var', split_by).mat.shape
+
+    plot_data = np.empty(shape=(2, n_sds, n_maps, n_pairs, n_subjs))
+    plot_data.fill(np.nan)
+
+    for type_idx, map_type in enumerate(['subj', 'subj_gp']):
+        for sd_idx, data in enumerate(all_maps):
+            for map_idx in range(n_maps):
+                if map_idx == 0:
+                    map_data = data[map_idx].get_corr_results('subj', 'subj', map_type, 'var', split_by).mat
+                    map_data = stat_func.r2z(map_data, metric='pearson')
+                    map_data = np.mean(map_data, axis=0)
+                    plot_data[type_idx, sd_idx, map_idx] = map_data
+                else:
+                    map_data = data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'var', split_by).mat
+                    map_data = stat_func.r2z(map_data, metric='pearson')
+                    map_data = np.mean(map_data, axis=0)
+                    if map_idx > 1 and n_pairs > 1:
+                        plot_data[type_idx, sd_idx, map_idx, 0] = map_data
+                    else:
+                        plot_data[type_idx, sd_idx, map_idx] = map_data
+
+    plot_data = -np.diff(plot_data, axis=0)
+    plot_data = np.squeeze(plot_data, axis=0)  # (n_sds, n_maps, n_pairs, n_subjs)
+    plot_data_in_r = stat_func.z2r(plot_data, metric='pearson')
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+    sd_labels = [str(sd) if sd != 0 else '0' for sd in sds]
+    pair_titles = ['Accuracy-Confidence', 'Accuracy-Reaction time', 'Reaction time-Confidence']
+    pair_fnames = ['acc_conf', 'acc_rt', 'rt_conf']
+
+    for pair_idx in range(n_pairs):
+        plt.clf()
+        plt.figure(figsize=(7, 4))
+
+        for sd_idx in range(n_sds):
+            for map_idx in range(n_maps):
+                vals = plot_data_in_r[sd_idx, map_idx, pair_idx, :]
+                if np.all(np.isnan(vals)):
+                    continue
+                x_pos = sd_idx * 4 + map_idx * 0.8
+                box = plt.boxplot(vals, positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+                _style_control_boxplot(box, colors(map_idx))
+                for k in range(n_subjs):
+                    plt.scatter(x_pos - 0.3, vals[k], color=colors(map_idx), s=5)
+
+        for sd_idx in range(n_sds):
+            sub_data = plot_data[sd_idx, :, pair_idx, :]
+            for map_idx in range(1, n_maps):
+                if np.all(np.isnan(sub_data[map_idx])):
+                    continue
+                t_stat, p_val = stats.ttest_ind(sub_data[0], sub_data[map_idx], equal_var=False, nan_policy='omit')
+                try:
+                    bayes10 = float(pg.ttest(sub_data[0], sub_data[map_idx], paired=False)['BF10'].values[0])
+                except Exception:
+                    bayes10 = np.nan
+                bayes01 = 1 / bayes10
+                print(f"Pair: {pair_titles[pair_idx]}, SD: {sd_labels[sd_idx]}, "
+                      f"Comparison: {map_labels[0]} vs {map_labels[map_idx]} - "
+                      f"t-stat: {t_stat:.4f}, p-value: {p_val:.6f}, BF10: {bayes10:.4f}, BF01: {bayes01:.4f}")
+
+                x_mid = sd_idx * 4 + map_idx * 0.4
+                y_max = np.nanmax(plot_data_in_r[sd_idx, :, pair_idx, :]) + 0.08 * map_idx
+                alpha = 0.5 if p_val < 0.05 else 1
+                if p_val < 1e-3:
+                    power = int(np.floor(np.log10(p_val)))
+                    coefficient = p_val / (10 ** power)
+                    anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                else:
+                    anno = r"$p = {:.3f}$".format(p_val)
+                plt.plot([sd_idx * 4, sd_idx * 4 + map_idx * 0.8], [y_max, y_max], color='black', linewidth=1.2, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=6, alpha=alpha)
+
+                t_stat0, p_val0 = stats.ttest_1samp(sub_data[map_idx], 0, nan_policy='omit')
+                star_x = sd_idx * 4 + map_idx * 0.8
+                star_y = np.nanmin(plot_data_in_r[sd_idx, :, pair_idx, :]) - 0.05
+                if p_val0 < 1e-3:
+                    star = '***'
+                elif p_val0 < 0.01:
+                    star = '**'
+                elif p_val0 < 0.05:
+                    star = '*'
+                else:
+                    star = 'n.s.'
+                plt.annotate(star, (star_x, star_y), ha='center', size=8, fontweight='bold',
+                             alpha=1 if p_val0 < 0.05 else 0.5)
+
+        plt.xticks([sd_idx * 4 + 1.2 for sd_idx in range(n_sds)], sd_labels, fontsize=12)
+        plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+        plt.xlabel('Accuracy shift (SD)', fontsize=14, fontweight='bold')
+        plt.ylabel(r'$r_{same\ subject} - r_{other\ subjects}$ ', fontsize=12, fontweight='bold')
+        plt.title(f'Correlation consistency - {pair_titles[pair_idx]}', fontsize=14, fontweight='bold')
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+        plt.tight_layout()
+        path_name = path / f'corr_btw_var_accuracy_control_{pair_fnames[pair_idx]}_split_{split_by}.png'
+        plt.savefig(path_name, dpi=384, transparent=True)
+        plt.close()
+
+
+def plot_rank_across_metric_consistency_accuracy_control(all_maps, sds, path):
+    """ Accuracy-control counterpart of plot_rank_across_metric_consistency (MNIST only).
+
+    Note: get_rank_results('subj', 'inst', 'var') broadcasts a single-pair
+    model's value across all pair slots (same behavior as the original
+    function relies on), so only the Acc-Conf pair (index 0) - or map_idx <= 1
+    (Human-Human/Human-RTNet) for the other pairs - is ever displayed/tested,
+    mirroring the original's guard conditions.
+    """
+    n_sds = len(all_maps)
+    n_maps = len(all_maps[0]) + 1
+    n_boots, n_pairs, n_subjs = all_maps[0][0].get_corr_results('subj', 'inst', 'subj', 'var').mat.shape
+
+    plot_data = np.empty(shape=(n_sds, n_maps, n_boots, n_pairs))
+    plot_data.fill(np.nan)
+    for sd_idx, data in enumerate(all_maps):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                map_data = data[map_idx].get_rank_results('subj', 'subj', 'var').mat
+                plot_data[sd_idx, map_idx] = map_data
+            else:
+                map_data = data[map_idx-1].get_rank_results('subj', 'inst', 'var').mat
+                plot_data[sd_idx, map_idx] = map_data
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+    sd_labels = [str(sd) if sd != 0 else 'Std' for sd in sds]
+    pair_titles = ['Accuracy-Confidence', 'Accuracy-Reaction time', 'Reaction time-Confidence']
+    pair_fnames = ['acc_conf', 'acc_rt', 'rt_conf']
+
+    for pair_idx in range(n_pairs):
+        plt.clf()
+        plt.figure(figsize=(7, 4))
+
+        for sd_idx in range(n_sds):
+            for map_idx in range(n_maps):
+                if pair_idx != 0 and not (map_idx <= 1):
+                    continue
+                x_pos = sd_idx * 4 + map_idx * 0.8
+                box = plt.boxplot(plot_data[sd_idx, map_idx, :, pair_idx], positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+                _style_control_boxplot(box, colors(map_idx))
+
+        for sd_idx in range(n_sds):
+            for map_idx in range(1, n_maps):
+                if pair_idx != 0 and not (map_idx == 1):
+                    continue
+                diff = plot_data[sd_idx, 0, :, pair_idx] - plot_data[sd_idx, map_idx, :, pair_idx]
+                p_val = 2 * min(np.mean(diff >= 0), np.mean(diff < 0))
+                ci_lower = np.percentile(diff, 2.5)
+                ci_upper = np.percentile(diff, 97.5)
+                print(f"Pair: {pair_titles[pair_idx]}, SD: {sd_labels[sd_idx]}, "
+                      f"Comparison: {map_labels[0]} vs {map_labels[map_idx]} - "
+                      f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
+
+                x_mid = sd_idx * 4 + map_idx * 0.4
+                y_max = np.nanmax(plot_data[sd_idx, :, :, pair_idx]) + 10 * map_idx
+                alpha = 0.5 if p_val < 0.05 else 1
+                anno = r'$p < 0.001$' if p_val < 0.001 else r'$p = {:.3f}$'.format(p_val)
+                plt.plot([sd_idx * 4, sd_idx * 4 + map_idx * 0.8], [y_max, y_max], color='black', linewidth=1.2, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=6, alpha=alpha)
+
+        plt.xticks([sd_idx * 4 + 1.2 for sd_idx in range(n_sds)], sd_labels, fontsize=12)
+        plt.xlabel('Accuracy shift (SD)', fontsize=14, fontweight='bold')
+        plt.ylabel('Rank consistency metric', fontsize=12)
+        plt.title(f'Rank consistency - {pair_titles[pair_idx]}', fontsize=14, fontweight='bold')
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+        plt.tight_layout()
+        path_name = path / f'rank_btw_var_accuracy_control_{pair_fnames[pair_idx]}.png'
+        plt.savefig(path_name, dpi=384, transparent=True)
+        plt.close()
