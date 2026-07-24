@@ -1,5 +1,7 @@
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from itertools import combinations, permutations
 from scipy.stats import sem, wasserstein_distance
 import pandas as pd
@@ -2740,3 +2742,1298 @@ def plot_rank_across_metric_consistency_accuracy_control(all_maps, sds, path):
         path_name = path / f'rank_btw_var_accuracy_control_{pair_fnames[pair_idx]}.png'
         plt.savefig(path_name, dpi=384, transparent=True)
         plt.close()
+
+
+def _add_control_legend(colors, n_maps):
+    legend_elements = [
+        Line2D([0], [0], marker='*', color='none', markerfacecolor='black',
+               markeredgecolor='black', markersize=7, label='Standard')
+    ]
+    plt.legend(handles=legend_elements, loc='upper right', fontsize=7, frameon=False)
+
+
+def _add_same_other_legend():
+    legend_elements = [
+        Patch(facecolor='grey', alpha=0.5, label='Same subject'),
+        Patch(facecolor='grey', alpha=0.5, hatch='///', label='Other subjects'),
+    ]
+    plt.legend(handles=legend_elements, loc='upper right', fontsize=8, frameon=False)
+
+
+def _plot_same_vs_other_debug(untr_z_raw, n_maps, n_groups, n_subjs, colors, x_pos_fn):
+    """ Debug scatter+box of the untrained network's raw same-subject vs
+    other-subjects values (pre-diff, in r-space), side by side per group. """
+    same_other_r = stat_func.z2r(untr_z_raw, metric='pearson')  # (2, n_maps, n_groups, n_subjs)
+    for map_idx in range(n_maps):
+        for group_idx in range(n_groups):
+            for type_idx in range(2):
+                vals = same_other_r[type_idx, map_idx, group_idx, :]
+                if np.all(np.isnan(vals)):
+                    continue
+                x_pos = x_pos_fn(group_idx, map_idx) + (type_idx - 0.5) * 0.3
+                box = plt.boxplot(vals, positions=[x_pos], widths=0.25, patch_artist=True, showfliers=False)
+                _style_control_boxplot(box, colors(map_idx))
+                if type_idx == 1:
+                    for patch in box['boxes']:
+                        patch.set_hatch('///')
+                for k in range(n_subjs):
+                    plt.scatter(x_pos, vals[k], color=colors(map_idx), s=4, alpha=0.6, zorder=3)
+
+
+def plot_corr_within_metric_consistency_control(standard_data, merged_control, name, path, split_by):
+    """ Control-instance counterpart of plot_corr_within_metric_consistency.
+
+    standard_data: [rtnet, alexnet, resnet18] IndiMap objects (variant='standard').
+    merged_control: [rtnet, alexnet, resnet18] merged-result dicts produced by
+    analyze_control.py's merge_combo (already r2z-averaged over the 60 control
+    instances, n_boots dimension intact). Boxes show the control distribution;
+    a star overlays the single standard-model reference (Human-Human is skipped
+    since it does not depend on which model's control instances were used).
+    """
+    n_maps = len(standard_data) + 1
+    n_boots, n_metrics, n_subjs = standard_data[0].get_corr_results('subj', 'inst', 'subj', 'split', split_by=split_by).mat.shape
+
+    std_z = np.empty(shape=(2, n_maps, n_metrics, n_subjs))
+    std_z.fill(np.nan)
+    ctrl_z = np.empty(shape=(2, n_maps, n_metrics, n_subjs))
+    ctrl_z.fill(np.nan)
+
+    for type_idx, map_type in enumerate(['subj', 'subj_gp']):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                std_mat = standard_data[map_idx].get_corr_results('subj', 'subj', map_type, 'split', split_by=split_by).mat
+                std_z[type_idx, map_idx] = np.nanmean(stat_func.r2z(std_mat, metric='pearson'), axis=0)
+
+                ctrl_mat = merged_control[map_idx][f'corr_split_subj_{map_type}_{split_by}']
+                ctrl_z[type_idx, map_idx] = np.nanmean(ctrl_mat, axis=0)
+            else:
+                std_mat = standard_data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'split', split_by=split_by).mat
+                std_mat = np.nanmean(stat_func.r2z(std_mat, metric='pearson'), axis=0)
+                try:
+                    std_z[type_idx, map_idx] = std_mat
+                except ValueError:
+                    std_z[type_idx, map_idx, :2] = std_mat
+
+                ctrl_mat = merged_control[map_idx-1][f'corr_split_inst_{map_type}_{split_by}']
+                ctrl_mat = np.nanmean(ctrl_mat, axis=0)
+                try:
+                    ctrl_z[type_idx, map_idx] = ctrl_mat
+                except ValueError:
+                    ctrl_z[type_idx, map_idx, :2] = ctrl_mat
+
+    std_z = np.squeeze(-np.diff(std_z, axis=0), axis=0)    # (n_maps, n_metrics, n_subjs)
+    ctrl_z = np.squeeze(-np.diff(ctrl_z, axis=0), axis=0)  # (n_maps, n_metrics, n_subjs)
+    std_r = stat_func.z2r(std_z, metric='pearson')
+    ctrl_r = stat_func.z2r(ctrl_z, metric='pearson')
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(5, 4))
+
+    for map_idx in range(n_maps):
+        for met_idx in range(n_metrics):
+            vals = ctrl_r[map_idx, met_idx, :]
+            if np.all(np.isnan(vals)):
+                continue
+            x_pos = met_idx * 4 + map_idx * 0.8
+            box = plt.boxplot(vals, positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+            _style_control_boxplot(box, colors(map_idx))
+            for k in range(n_subjs):
+                plt.scatter(x_pos - 0.3, vals[k], color=colors(map_idx), s=5)
+
+            if map_idx == 0:
+                continue  # Human-Human standard == control reference, redundant to show
+            std_vals = std_r[map_idx, met_idx, :]
+            if not np.all(np.isnan(std_vals)):
+                plt.scatter(x_pos + 0.3, np.nanmean(std_vals), marker='*', s=80,
+                            color=colors(map_idx), edgecolor='black', linewidth=1, zorder=5)
+
+    data_all = np.concatenate([ctrl_r[np.isfinite(ctrl_r)], std_r[np.isfinite(std_r)]])
+    data_min, data_max = np.nanmin(data_all), np.nanmax(data_all)
+    data_range = data_max - data_min
+    vs_zero_y = data_min - 0.15 * data_range
+    max_bracket = data_max
+
+    for met_idx in range(n_metrics):
+        sub_data = ctrl_z[:, met_idx, :]
+        for i in range(sub_data.shape[0]):
+            for j in range(i + 1, sub_data.shape[0]):
+                if map_labels[i] != 'Human-Human':
+                    continue
+                if np.all(np.isnan(sub_data[j])):
+                    continue
+
+                # two-sided: Human-Human vs Human-Model
+                t_stat, p_val = stats.ttest_ind(sub_data[i], sub_data[j], equal_var=False, nan_policy='omit')
+                try:
+                    bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
+                except Exception:
+                    bayes10 = np.nan
+                bayes01 = 1 / bayes10
+                print(f"Metric: {['Accuracy', 'Confidence', 'Reaction time'][met_idx]}, "
+                      f"Comparison: {map_labels[i]} vs {map_labels[j]} - "
+                      f"t-stat: {t_stat:.4f}, p-value: {p_val:.8f}, "
+                      f"BF10: {bayes10:.4f}, BF01: {bayes01:.4f}")
+
+                x_mid = (met_idx * 4 + i * 0.8 + met_idx * 4 + j * 0.8) / 2
+                y_max = np.nanmax(ctrl_r[:, met_idx, :]) + 0.08 * data_range * j
+                max_bracket = max(max_bracket, y_max)
+                alpha = 0.5 if p_val < 0.05 else 1
+                if p_val < 1e-3:
+                    power = int(np.floor(np.log10(p_val)))
+                    coefficient = p_val / (10 ** power)
+                    anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                else:
+                    anno = r"$p = {:.3f}$".format(p_val)
+                plt.plot([met_idx * 4 + i * 0.8, met_idx * 4 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
+
+                # one-sided: Human-Model vs 0
+                t_stat0, p_val0 = stats.ttest_1samp(sub_data[j], 0, alternative='greater', nan_policy='omit')
+                x_pos0 = (met_idx * 4 + j * 0.8) + 0.15
+                if p_val0 < 1e-3:
+                    star = '***'
+                elif p_val0 < 0.01:
+                    star = '**'
+                elif p_val0 < 0.05:
+                    star = '*'
+                else:
+                    star = 'n.s.'
+                alpha0 = 1 if p_val0 < 0.05 else 0.5
+                plt.annotate(star, (x_pos0, vs_zero_y), ha='center', size=8, alpha=alpha0, fontweight='bold')
+
+    plt.xticks([1.2, 5.2, 8.4], ['Accuracy', 'Confidence', 'RT'], fontsize=12)
+    plt.xlim(-1, 10)
+    plt.ylim(vs_zero_y - 0.08 * data_range, max_bracket + 0.15 * data_range)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
+    plt.ylabel(r'$r_{same\ subject} - r_{other\ subjects}$ ', fontsize=12, fontweight='bold')
+    plt.title('Correlation consistency (control)', fontsize=16, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    _add_control_legend(colors, n_maps)
+    plt.tight_layout()
+    path_name = path / f'corr_btw_bs_control_{name}_split_{split_by}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_rank_within_metric_consistency_control(standard_data, merged_control, name, path):
+    """ Control-instance counterpart of plot_rank_within_metric_consistency. """
+    n_maps = len(standard_data) + 1
+    n_boots, n_metrics, n_subjs = standard_data[0].get_corr_results('subj', 'inst', 'subj', 'split').mat.shape
+
+    std_data = np.empty(shape=(n_maps, n_boots, n_metrics))
+    std_data.fill(np.nan)
+    ctrl_data = np.empty(shape=(n_maps, n_boots, n_metrics))
+    ctrl_data.fill(np.nan)
+
+    for map_idx in range(n_maps):
+        if map_idx == 0:
+            std_data[map_idx] = standard_data[map_idx].get_rank_results('subj', 'subj', 'split').mat
+            ctrl_data[map_idx] = merged_control[map_idx]['rank_split_subj']
+        else:
+            std_mat = standard_data[map_idx-1].get_rank_results('subj', 'inst', 'split').mat
+            try:
+                std_data[map_idx] = std_mat
+            except ValueError:
+                std_data[map_idx, :, :2] = std_mat
+
+            ctrl_mat = merged_control[map_idx-1]['rank_split_inst']
+            try:
+                ctrl_data[map_idx] = ctrl_mat
+            except ValueError:
+                ctrl_data[map_idx, :, :2] = ctrl_mat
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(5, 4))
+
+    for map_idx in range(n_maps):
+        for met_idx in range(n_metrics):
+            if map_idx > 1 and met_idx > 1:
+                continue
+            vals = ctrl_data[map_idx, :, met_idx]
+            if np.all(np.isnan(vals)):
+                continue
+            x_pos = met_idx * 4 + map_idx * 0.8
+            box = plt.boxplot(vals, positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+            _style_control_boxplot(box, colors(map_idx))
+
+            if map_idx == 0:
+                continue  # Human-Human standard == control reference, redundant to show
+            std_vals = std_data[map_idx, :, met_idx]
+            if not np.all(np.isnan(std_vals)):
+                plt.scatter(x_pos + 0.3, np.nanmean(std_vals), marker='*', s=80,
+                            color=colors(map_idx), edgecolor='black', linewidth=1, zorder=5)
+
+    data_all = np.concatenate([ctrl_data[np.isfinite(ctrl_data)], std_data[np.isfinite(std_data)]])
+    data_min, data_max = np.nanmin(data_all), np.nanmax(data_all)
+    data_range = data_max - data_min
+    max_bracket = data_max
+    min_annot = data_min
+
+    if name == 'mnist':
+        for map_idx in range(1, n_maps):
+            diff = ctrl_data[0] - ctrl_data[map_idx]
+            for met_idx in range(n_metrics):
+                for_proportion = diff[:, met_idx]
+                p_val = 2 * min(
+                    len(for_proportion[for_proportion >= 0]) / len(for_proportion),
+                    len(for_proportion[for_proportion < 0]) / len(for_proportion)
+                )
+                ci_lower = np.percentile(for_proportion, 2.5)
+                ci_upper = np.percentile(for_proportion, 97.5)
+                print(f"Comparison: Subject vs {['RTNet', 'AlexNet', 'ResNet18'][map_idx-1]} - "
+                      f"Metric: {['Accuracy', 'Confidence', 'Reaction time'][met_idx]} - "
+                      f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
+                if met_idx == 2 and not (map_idx == 1):
+                    continue
+                x_mid = (met_idx * 4 + met_idx * 4 + map_idx * 0.8) / 2
+                y_max = np.nanmax(ctrl_data[:, :, met_idx]) + 0.08 * data_range * map_idx
+                max_bracket = max(max_bracket, y_max)
+                alpha = 0.5 if p_val < 0.05 else 1
+                anno = r'$p < 0.001$' if p_val < 0.001 else r'$p = {:.3f}$'.format(p_val)
+                plt.plot([met_idx * 4, met_idx * 4 + map_idx * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
+
+    if name == 'ecoset10':
+        for map_idx in range(1, n_maps):
+            for met_idx in range(n_metrics):
+                for_proportion = ctrl_data[map_idx, :, met_idx]
+                p_val = 2 * min(
+                    len(for_proportion[for_proportion >= 0]) / len(for_proportion),
+                    len(for_proportion[for_proportion < 0]) / len(for_proportion)
+                )
+                ci_lower = np.percentile(for_proportion, 2.5)
+                ci_upper = np.percentile(for_proportion, 97.5)
+                print(f"Comparison: Subject vs {['RTNet', 'AlexNet', 'ResNet18'][map_idx-1]} - "
+                      f"Metric: {['Accuracy', 'Confidence', 'Reaction time'][met_idx]} - "
+                      f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
+                if met_idx == 2 and not (map_idx == 1):
+                    continue
+                x_pos = (met_idx * 4 + map_idx * 0.8)
+                y_max = np.nanpercentile(ctrl_data[map_idx, :, met_idx], 0) - 0.08 * data_range
+                min_annot = min(min_annot, y_max)
+                if p_val < 1e-3:
+                    anno = '***'
+                elif p_val < 0.01:
+                    anno = '**'
+                elif p_val < 0.05:
+                    anno = '*'
+                else:
+                    anno = 'n.s.'
+                alpha = 1 if p_val < 0.05 else 0.5
+                plt.annotate(anno, (x_pos, y_max), ha='center', size=9, alpha=alpha, fontweight='bold')
+
+    plt.xticks([1.2, 5.2, 8.4], ['Accuracy', 'Confidence', 'RT'], fontsize=12)
+    plt.ylim(min_annot - 0.08 * data_range, max_bracket + 0.15 * data_range)
+    plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
+    plt.ylabel('Rank consistency metric', fontsize=12)
+    plt.title('Rank consistency (control)', fontsize=16, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    _add_control_legend(colors, n_maps)
+    plt.tight_layout()
+    path_name = path / f'rank_btw_bs_control_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_corr_across_metric_consistency_control(standard_data, merged_control, name, path, split_by):
+    """ Control-instance counterpart of plot_corr_across_metric_consistency. """
+    n_maps = len(standard_data) + 1
+    n_boots, n_pairs, n_subjs = standard_data[0].get_corr_results('subj', 'inst', 'subj', 'var', split_by).mat.shape
+
+    std_z = np.empty(shape=(2, n_maps, n_pairs, n_subjs))
+    std_z.fill(np.nan)
+    ctrl_z = np.empty(shape=(2, n_maps, n_pairs, n_subjs))
+    ctrl_z.fill(np.nan)
+
+    for type_idx, map_type in enumerate(['subj', 'subj_gp']):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                std_mat = standard_data[map_idx].get_corr_results('subj', 'subj', map_type, 'var', split_by).mat
+                std_z[type_idx, map_idx] = np.mean(stat_func.r2z(std_mat, metric='pearson'), axis=0)
+
+                ctrl_mat = merged_control[map_idx][f'corr_var_subj_{map_type}_{split_by}']
+                ctrl_z[type_idx, map_idx] = np.nanmean(ctrl_mat, axis=0)
+            else:
+                std_mat = standard_data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'var', split_by).mat
+                std_mat = np.mean(stat_func.r2z(std_mat, metric='pearson'), axis=0)
+                if map_idx > 1 and n_pairs > 1:
+                    std_z[type_idx, map_idx, 0] = std_mat
+                else:
+                    std_z[type_idx, map_idx] = std_mat
+
+                ctrl_mat = merged_control[map_idx-1][f'corr_var_inst_{map_type}_{split_by}']
+                ctrl_mat = np.nanmean(ctrl_mat, axis=0)
+                if map_idx > 1 and n_pairs > 1:
+                    ctrl_z[type_idx, map_idx, 0] = ctrl_mat
+                else:
+                    ctrl_z[type_idx, map_idx] = ctrl_mat
+
+    std_z = np.squeeze(-np.diff(std_z, axis=0), axis=0)
+    ctrl_z = np.squeeze(-np.diff(ctrl_z, axis=0), axis=0)
+    std_r = stat_func.z2r(std_z, metric='pearson')
+    ctrl_r = stat_func.z2r(ctrl_z, metric='pearson')
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(4, 4))
+
+    for map_idx in range(n_maps):
+        for pair_idx in range(n_pairs):
+            vals = ctrl_r[map_idx, pair_idx, :]
+            if np.all(np.isnan(vals)):
+                continue
+            x_pos = pair_idx * 4 + map_idx * 0.8 if pair_idx < 2 else pair_idx * 3.2 + map_idx * 0.8
+            box = plt.boxplot(vals, positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+            _style_control_boxplot(box, colors(map_idx))
+            for k in range(n_subjs):
+                plt.scatter(x_pos - 0.3, vals[k], color=colors(map_idx), s=5)
+
+            if map_idx == 0:
+                continue  # Human-Human standard == control reference, redundant to show
+            std_vals = std_r[map_idx, pair_idx, :]
+            if not np.all(np.isnan(std_vals)):
+                plt.scatter(x_pos + 0.3, np.nanmean(std_vals), marker='*', s=80,
+                            color=colors(map_idx), edgecolor='black', linewidth=1, zorder=5)
+
+    data_all = np.concatenate([ctrl_r[np.isfinite(ctrl_r)], std_r[np.isfinite(std_r)]])
+    data_min, data_max = np.nanmin(data_all), np.nanmax(data_all)
+    data_range = data_max - data_min
+    vs_zero_y = data_min - 0.15 * data_range
+    max_bracket = data_max
+
+    for pair_idx in range(n_pairs):
+        sub_data = ctrl_z[:, pair_idx, :]
+        for i in range(sub_data.shape[0]):
+            for j in range(i + 1, sub_data.shape[0]):
+                if map_labels[i] != 'Human-Human':
+                    continue
+                if np.all(np.isnan(sub_data[j])):
+                    continue
+
+                # two-sided: Human-Human vs Human-Model
+                t_stat, p_val = stats.ttest_ind(sub_data[i], sub_data[j], equal_var=False, nan_policy='omit')
+                try:
+                    bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
+                except Exception:
+                    bayes10 = np.nan
+                bayes01 = 1 / bayes10
+                print(f"Pair: {['Accuracy-Confidence', 'Accuracy-Reaction time', 'Reaction time-Confidence'][pair_idx]}, "
+                      f"Comparison: {map_labels[i]} vs {map_labels[j]} - "
+                      f"t-stat: {t_stat:.4f}, p-value: {p_val:.6f}, "
+                      f"BF10: {bayes10:.4f}, BF01: {bayes01:.4f}")
+
+                if pair_idx < 2:
+                    x_mid = (pair_idx * 4 + i * 0.8 + pair_idx * 4 + j * 0.8) / 2
+                    plot_x_pos = [pair_idx * 4, pair_idx * 4 + j * 0.8]
+                else:
+                    x_mid = (pair_idx * 3.2 + i * 0.8 + pair_idx * 3.2 + j * 0.8) / 2
+                    plot_x_pos = [pair_idx * 3.2, pair_idx * 3.2 + j * 0.8]
+
+                y_max = np.nanmax(ctrl_r[:, pair_idx, :]) + 0.08 * data_range * j
+                max_bracket = max(max_bracket, y_max)
+                alpha = 0.5 if p_val < 0.05 else 1
+                if p_val < 1e-3:
+                    power = int(np.floor(np.log10(p_val)))
+                    coefficient = p_val / (10 ** power)
+                    anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                else:
+                    anno = r"$p = {:.3f}$".format(p_val)
+                plt.plot(plot_x_pos, [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
+
+                # one-sided: Human-Model vs 0
+                t_stat0, p_val0 = stats.ttest_1samp(sub_data[j], 0, alternative='greater', nan_policy='omit')
+                if pair_idx < 2:
+                    x_pos0 = pair_idx * 4 + j * 0.8 + 0.15
+                else:
+                    x_pos0 = pair_idx * 3.2 + j * 0.8 + 0.15
+                if p_val0 < 1e-3:
+                    star = '***'
+                elif p_val0 < 0.01:
+                    star = '**'
+                elif p_val0 < 0.05:
+                    star = '*'
+                else:
+                    star = 'n.s.'
+                alpha0 = 1 if p_val0 < 0.05 else 0.5
+                plt.annotate(star, (x_pos0, vs_zero_y), ha='center', size=8, alpha=alpha0, fontweight='bold')
+
+    plt.xticks([1.2, 4.4, 6.8], ['Acc-Conf', 'Acc-RT', 'Conf-RT'], fontsize=12)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlim(-1, 8.5)
+    plt.ylim(vs_zero_y - 0.08 * data_range, max_bracket + 0.15 * data_range)
+    plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
+    plt.ylabel(r'$r_{same\ subject} - r_{other\ subjects}$ ', fontsize=12, fontweight='bold')
+    plt.title('Correlation consistency (control)', fontsize=14, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    _add_control_legend(colors, n_maps)
+    plt.tight_layout()
+    path_name = path / f'corr_btw_var_control_{name}_split_{split_by}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_rank_across_metric_consistency_control(standard_data, merged_control, name, path):
+    """ Control-instance counterpart of plot_rank_across_metric_consistency. """
+    n_maps = len(standard_data) + 1
+    n_boots, n_pairs, n_subjs = standard_data[0].get_corr_results('subj', 'inst', 'subj', 'var').mat.shape
+
+    std_data = np.empty(shape=(n_maps, n_boots, n_pairs))
+    std_data.fill(np.nan)
+    ctrl_data = np.empty(shape=(n_maps, n_boots, n_pairs))
+    ctrl_data.fill(np.nan)
+
+    for map_idx in range(n_maps):
+        if map_idx == 0:
+            std_data[map_idx] = standard_data[map_idx].get_rank_results('subj', 'subj', 'var').mat
+            ctrl_data[map_idx] = merged_control[map_idx]['rank_var_subj']
+        else:
+            std_data[map_idx] = standard_data[map_idx-1].get_rank_results('subj', 'inst', 'var').mat
+            ctrl_data[map_idx] = merged_control[map_idx-1]['rank_var_inst']
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(4, 4))
+
+    for map_idx in range(n_maps):
+        for pair_idx in range(n_pairs):
+            if pair_idx != 0 and not (map_idx <= 1):
+                continue
+            x_pos = pair_idx * 4 + map_idx * 0.8 if pair_idx < 2 else pair_idx * 3.2 + map_idx * 0.8
+            box = plt.boxplot(ctrl_data[map_idx, :, pair_idx], positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+            _style_control_boxplot(box, colors(map_idx))
+
+            if map_idx == 0:
+                continue  # Human-Human standard == control reference, redundant to show
+            std_vals = std_data[map_idx, :, pair_idx]
+            plt.scatter(x_pos + 0.3, np.nanmean(std_vals), marker='*', s=80,
+                        color=colors(map_idx), edgecolor='black', linewidth=1, zorder=5)
+
+    data_all = np.concatenate([ctrl_data[np.isfinite(ctrl_data)], std_data[np.isfinite(std_data)]])
+    data_min, data_max = np.nanmin(data_all), np.nanmax(data_all)
+    data_range = data_max - data_min
+    max_bracket = data_max
+    min_annot = data_min
+
+    if name == 'mnist':
+        for map_idx in range(1, n_maps):
+            diff = ctrl_data[0] - ctrl_data[map_idx]
+            for pair_idx in range(n_pairs):
+                if pair_idx != 0 and not (map_idx == 1):
+                    continue
+                for_proportion = diff[:, pair_idx]
+                p_val = 2 * min(
+                    len(for_proportion[for_proportion >= 0]) / len(for_proportion),
+                    len(for_proportion[for_proportion < 0]) / len(for_proportion)
+                )
+                ci_lower = np.percentile(for_proportion, 2.5)
+                ci_upper = np.percentile(for_proportion, 97.5)
+                print(f"Comparison: Subject vs {['RTNet', 'AlexNet', 'ResNet18'][map_idx-1]} - "
+                      f"Pair: {['Accuracy-Confidence', 'Accuracy-Reaction time', 'Reaction time-Confidence'][pair_idx]} - "
+                      f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
+                if pair_idx < 2:
+                    x_mid = (pair_idx * 4 + pair_idx * 4 + map_idx * 0.8) / 2
+                    plot_x_pos = [pair_idx * 4, pair_idx * 4 + map_idx * 0.8]
+                else:
+                    x_mid = (pair_idx * 3.2 + pair_idx * 3.2 + map_idx * 0.8) / 2
+                    plot_x_pos = [pair_idx * 3.2, pair_idx * 3.2 + map_idx * 0.8]
+                y_max = np.nanmax(ctrl_data[:, :, pair_idx]) + 0.08 * data_range * map_idx
+                max_bracket = max(max_bracket, y_max)
+                alpha = 0.5 if p_val < 0.05 else 1
+                anno = r'$p < 0.001$' if p_val < 0.001 else r'$p = {:.3f}$'.format(p_val)
+                plt.plot(plot_x_pos, [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
+
+    if name == 'ecoset10':
+        for map_idx in range(1, n_maps):
+            for pair_idx in range(n_pairs):
+                if pair_idx != 0 and not (map_idx == 1):
+                    continue
+                for_proportion = ctrl_data[map_idx, :, pair_idx]
+                p_val = 2 * min(
+                    len(for_proportion[for_proportion >= 0]) / len(for_proportion),
+                    len(for_proportion[for_proportion < 0]) / len(for_proportion)
+                )
+                ci_lower = np.percentile(for_proportion, 2.5)
+                ci_upper = np.percentile(for_proportion, 97.5)
+                print(f"Comparison: Subject vs {['RTNet', 'AlexNet', 'ResNet18'][map_idx-1]} - "
+                      f"Pair: {['Accuracy-Confidence', 'Accuracy-Reaction time', 'Reaction time-Confidence'][pair_idx]} - "
+                      f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
+                if pair_idx < 2:
+                    x_pos = pair_idx * 4 + map_idx * 0.8
+                else:
+                    x_pos = pair_idx * 3.2 + map_idx * 0.8
+                y_max = min_annot - 0.08 * data_range
+                min_annot = min(min_annot, y_max)
+                if p_val < 1e-3:
+                    anno = '***'
+                elif p_val < 0.01:
+                    anno = '**'
+                elif p_val < 0.05:
+                    anno = '*'
+                else:
+                    anno = 'n.s.'
+                alpha = 1 if p_val < 0.05 else 0.5
+                plt.annotate(anno, (x_pos, y_max), ha='center', size=9, alpha=alpha, fontweight='bold')
+
+    plt.xticks([1.2, 4.4, 6.8], ['Acc-Conf', 'Acc-RT', 'Conf-RT'], fontsize=12)
+    plt.xlim(-1, 8.5)
+    plt.ylim(min_annot - 0.08 * data_range, max_bracket + 0.15 * data_range)
+    plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
+    plt.ylabel('Rank consistency metric', fontsize=12)
+    plt.title('Rank consistency (control)', fontsize=14, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    _add_control_legend(colors, n_maps)
+    plt.tight_layout()
+    path_name = path / f'rank_btw_var_control_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_top_identifiability_untrained(standard_data, untrained_data, name, path):
+    """ Untrained-network counterpart of plot_top_identifiability.
+
+    standard_data / untrained_data: [rtnet, alexnet, resnet18] IndiMap objects
+    (variant='standard' / variant='untrained'). Boxes show the untrained
+    network's per-subject distribution; a star overlays the standard
+    (trained) network's reference value. Human-Human is skipped for the star
+    since it does not depend on the model's training state.
+    """
+    n_maps = len(untrained_data) + 1
+    _, n_metrics, n_subjs = untrained_data[0].get_top_iden('subj', 'inst', 'pair').mat.shape
+
+    std_z = np.empty(shape=(2, n_maps, n_metrics, n_subjs))
+    std_z.fill(np.nan)
+    untr_z = np.empty(shape=(2, n_maps, n_metrics, n_subjs))
+    untr_z.fill(np.nan)
+
+    for type_idx, map_type in enumerate(['pair', 'gp']):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                std_mat = standard_data[map_idx].get_top_iden('subj', 'subj', map_type).mat
+                std_z[type_idx, map_idx] = np.nanmean(stat_func.r2z(std_mat, metric='pearson'), axis=0)
+
+                untr_mat = untrained_data[map_idx].get_top_iden('subj', 'subj', map_type).mat
+                untr_z[type_idx, map_idx] = np.nanmean(stat_func.r2z(untr_mat, metric='pearson'), axis=0)
+            else:
+                std_mat = standard_data[map_idx-1].get_top_iden('subj', 'inst', map_type).mat
+                std_mat = np.nanmean(stat_func.r2z(std_mat, metric='pearson'), axis=0)
+                try:
+                    std_z[type_idx, map_idx] = std_mat
+                except ValueError:
+                    std_z[type_idx, map_idx, :2] = std_mat
+
+                untr_mat = untrained_data[map_idx-1].get_top_iden('subj', 'inst', map_type).mat
+                untr_mat = np.nanmean(stat_func.r2z(untr_mat, metric='pearson'), axis=0)
+                try:
+                    untr_z[type_idx, map_idx] = untr_mat
+                except ValueError:
+                    untr_z[type_idx, map_idx, :2] = untr_mat
+
+    untr_z_raw = untr_z.copy()  # (2, n_maps, n_metrics, n_subjs), pre-diff, for the debug plot below
+
+    std_z = np.squeeze(-np.diff(std_z, axis=0), axis=0)
+    untr_z = np.squeeze(-np.diff(untr_z, axis=0), axis=0)
+    std_r = stat_func.z2r(std_z, metric='pearson')
+    untr_r = stat_func.z2r(untr_z, metric='pearson')
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(5, 4))
+
+    for map_idx in range(n_maps):
+        for met_idx in range(n_metrics):
+            vals = untr_r[map_idx, met_idx, :]
+            if np.all(np.isnan(vals)):
+                continue
+            x_pos = met_idx * 4 + map_idx * 0.8
+            box = plt.boxplot(vals, positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+            _style_control_boxplot(box, colors(map_idx))
+            for k in range(n_subjs):
+                plt.scatter(x_pos - 0.3, vals[k], color=colors(map_idx), s=5)
+
+            if map_idx == 0:
+                continue  # Human-Human standard == untrained reference, redundant to show
+            std_vals = std_r[map_idx, met_idx, :]
+            if not np.all(np.isnan(std_vals)):
+                plt.scatter(x_pos + 0.3, np.nanmean(std_vals), marker='*', s=60,
+                            color=colors(map_idx), edgecolor='black', linewidth=0.5, zorder=5)
+
+    data_all = np.concatenate([untr_r[np.isfinite(untr_r)], std_r[np.isfinite(std_r)]])
+    data_min, data_max = np.nanmin(data_all), np.nanmax(data_all)
+    data_range = data_max - data_min
+    vs_zero_y = data_min - 0.15 * data_range
+    max_bracket = data_max
+
+    for met_idx in range(n_metrics):
+        sub_data = untr_z[:, met_idx, :]
+        for i in range(sub_data.shape[0]):
+            for j in range(i + 1, sub_data.shape[0]):
+                if map_labels[i] != 'Human-Human':
+                    continue
+                if np.all(np.isnan(sub_data[j])):
+                    continue
+
+                # two-sided: Human-Human vs Human-Model
+                t_stat, p_val = stats.ttest_ind(sub_data[i], sub_data[j], equal_var=False, nan_policy='omit')
+                try:
+                    bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
+                except Exception:
+                    bayes10 = np.nan
+                bayes01 = 1 / bayes10
+                print(f"Metric: {['Accuracy', 'Confidence', 'Reaction time'][met_idx]}, "
+                      f"Comparison: {map_labels[i]} vs {map_labels[j]} - "
+                      f"t-stat: {t_stat:.4f}, p-value: {p_val:.8f}, "
+                      f"BF10: {bayes10:.4f}, BF01: {bayes01:.4f}")
+
+                x_mid = (met_idx * 4 + i * 0.8 + met_idx * 4 + j * 0.8) / 2
+                y_max = np.nanmax(untr_r[:, met_idx, :]) + 0.08 * data_range * j
+                max_bracket = max(max_bracket, y_max)
+                alpha = 0.5 if p_val < 0.05 else 1
+                if p_val < 1e-3:
+                    power = int(np.floor(np.log10(p_val)))
+                    coefficient = p_val / (10 ** power)
+                    anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                else:
+                    anno = r"$p = {:.3f}$".format(p_val)
+                plt.plot([met_idx * 4 + i * 0.8, met_idx * 4 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
+
+                # one-sided: Human-Model vs 0
+                t_stat0, p_val0 = stats.ttest_1samp(sub_data[j], 0, alternative='greater', nan_policy='omit')
+                x_pos0 = (met_idx * 4 + j * 0.8) + 0.15
+                if p_val0 < 1e-3:
+                    star = '***'
+                elif p_val0 < 0.01:
+                    star = '**'
+                elif p_val0 < 0.05:
+                    star = '*'
+                else:
+                    star = 'n.s.'
+                alpha0 = 1 if p_val0 < 0.05 else 0.5
+                plt.annotate(star, (x_pos0, vs_zero_y), ha='center', size=8, alpha=alpha0, fontweight='bold')
+
+    plt.xticks([1.2, 5.2, 8.4], ['Accuracy', 'Confidence', 'RT'], fontsize=12)
+    plt.xlim(-1, 10)
+    plt.ylim(vs_zero_y - 0.08 * data_range, max_bracket + 0.15 * data_range)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
+    plt.ylabel(r'$r_{best\ pair} - r_{other\ pairs}$ ', fontsize=12, fontweight='bold')
+    plt.title('Best-pair advantage (untrained)', fontsize=16, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    _add_control_legend(colors, n_maps)
+    plt.tight_layout()
+    path_name = path / f'top_btw_bs_untrained_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+    # ---- debug: untrained network's same-subject vs other-subjects side by side (not differenced) ----
+    plt.clf()
+    plt.figure(figsize=(7, 4))
+    _plot_same_vs_other_debug(untr_z_raw, n_maps, n_metrics, n_subjs, colors,
+                               x_pos_fn=lambda met_idx, map_idx: met_idx * 4 + map_idx * 0.8)
+    _add_same_other_legend()
+    plt.xticks([1.2, 5.2, 8.4], ['Accuracy', 'Confidence', 'RT'], fontsize=12)
+    plt.xlim(-1, 10)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
+    plt.ylabel(r'$r$', fontsize=12, fontweight='bold')
+    plt.title('Best-pair advantage (untrained) - debug: same vs other', fontsize=13, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    path_name = path / f'top_btw_bs_untrained_{name}_debug.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_corr_within_metric_consistency_untrained(standard_data, untrained_data, name, path, split_by):
+    """ Untrained-network counterpart of plot_corr_within_metric_consistency.
+
+    Boxes show the untrained network's per-subject consistency; a star
+    overlays the standard (trained) network's reference value.
+    """
+    n_maps = len(untrained_data) + 1
+    n_boots, n_metrics, n_subjs = untrained_data[0].get_corr_results('subj', 'inst', 'subj', 'split', split_by=split_by).mat.shape
+
+    std_z = np.empty(shape=(2, n_maps, n_metrics, n_subjs))
+    std_z.fill(np.nan)
+    untr_z = np.empty(shape=(2, n_maps, n_metrics, n_subjs))
+    untr_z.fill(np.nan)
+
+    for type_idx, map_type in enumerate(['subj', 'subj_gp']):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                std_mat = standard_data[map_idx].get_corr_results('subj', 'subj', map_type, 'split', split_by=split_by).mat
+                std_z[type_idx, map_idx] = np.nanmean(stat_func.r2z(std_mat, metric='pearson'), axis=0)
+
+                untr_mat = untrained_data[map_idx].get_corr_results('subj', 'subj', map_type, 'split', split_by=split_by).mat
+                untr_z[type_idx, map_idx] = np.nanmean(stat_func.r2z(untr_mat, metric='pearson'), axis=0)
+            else:
+                std_mat = standard_data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'split', split_by=split_by).mat
+                std_mat = np.nanmean(stat_func.r2z(std_mat, metric='pearson'), axis=0)
+                try:
+                    std_z[type_idx, map_idx] = std_mat
+                except ValueError:
+                    std_z[type_idx, map_idx, :2] = std_mat
+
+                untr_mat = untrained_data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'split', split_by=split_by).mat
+                untr_mat = np.nanmean(stat_func.r2z(untr_mat, metric='pearson'), axis=0)
+                try:
+                    untr_z[type_idx, map_idx] = untr_mat
+                except ValueError:
+                    untr_z[type_idx, map_idx, :2] = untr_mat
+
+    untr_z_raw = untr_z.copy()  # (2, n_maps, n_metrics, n_subjs), pre-diff, for the debug plot below
+
+    std_z = np.squeeze(-np.diff(std_z, axis=0), axis=0)    # (n_maps, n_metrics, n_subjs)
+    untr_z = np.squeeze(-np.diff(untr_z, axis=0), axis=0)  # (n_maps, n_metrics, n_subjs)
+    std_r = stat_func.z2r(std_z, metric='pearson')
+    untr_r = stat_func.z2r(untr_z, metric='pearson')
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(5, 4))
+
+    for map_idx in range(n_maps):
+        for met_idx in range(n_metrics):
+            vals = untr_r[map_idx, met_idx, :]
+            if np.all(np.isnan(vals)):
+                continue
+            x_pos = met_idx * 4 + map_idx * 0.8
+            box = plt.boxplot(vals, positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+            _style_control_boxplot(box, colors(map_idx))
+            for k in range(n_subjs):
+                plt.scatter(x_pos - 0.3, vals[k], color=colors(map_idx), s=5)
+
+            if map_idx == 0:
+                continue  # Human-Human standard == untrained reference, redundant to show
+            std_vals = std_r[map_idx, met_idx, :]
+            if not np.all(np.isnan(std_vals)):
+                plt.scatter(x_pos + 0.3, np.nanmean(std_vals), marker='*', s=60,
+                            color=colors(map_idx), edgecolor='black', linewidth=0.5, zorder=5)
+
+    data_all = np.concatenate([untr_r[np.isfinite(untr_r)], std_r[np.isfinite(std_r)]])
+    data_min, data_max = np.nanmin(data_all), np.nanmax(data_all)
+    data_range = data_max - data_min
+    vs_zero_y = data_min - 0.15 * data_range
+    max_bracket = data_max
+
+    for met_idx in range(n_metrics):
+        sub_data = untr_z[:, met_idx, :]
+        for i in range(sub_data.shape[0]):
+            for j in range(i + 1, sub_data.shape[0]):
+                if map_labels[i] != 'Human-Human':
+                    continue
+                if np.all(np.isnan(sub_data[j])):
+                    continue
+
+                # two-sided: Human-Human vs Human-Model
+                t_stat, p_val = stats.ttest_ind(sub_data[i], sub_data[j], equal_var=False, nan_policy='omit')
+                try:
+                    bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
+                except Exception:
+                    bayes10 = np.nan
+                bayes01 = 1 / bayes10
+                print(f"Metric: {['Accuracy', 'Confidence', 'Reaction time'][met_idx]}, "
+                      f"Comparison: {map_labels[i]} vs {map_labels[j]} - "
+                      f"t-stat: {t_stat:.4f}, p-value: {p_val:.8f}, "
+                      f"BF10: {bayes10:.4f}, BF01: {bayes01:.4f}")
+
+                x_mid = (met_idx * 4 + i * 0.8 + met_idx * 4 + j * 0.8) / 2
+                y_max = np.nanmax(untr_r[:, met_idx, :]) + 0.08 * data_range * j
+                max_bracket = max(max_bracket, y_max)
+                alpha = 0.5 if p_val < 0.05 else 1
+                if p_val < 1e-3:
+                    power = int(np.floor(np.log10(p_val)))
+                    coefficient = p_val / (10 ** power)
+                    anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                else:
+                    anno = r"$p = {:.3f}$".format(p_val)
+                plt.plot([met_idx * 4 + i * 0.8, met_idx * 4 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
+
+                # one-sided: Human-Model vs 0
+                t_stat0, p_val0 = stats.ttest_1samp(sub_data[j], 0, alternative='greater', nan_policy='omit')
+                x_pos0 = (met_idx * 4 + j * 0.8) + 0.15
+                if p_val0 < 1e-3:
+                    star = '***'
+                elif p_val0 < 0.01:
+                    star = '**'
+                elif p_val0 < 0.05:
+                    star = '*'
+                else:
+                    star = 'n.s.'
+                alpha0 = 1 if p_val0 < 0.05 else 0.5
+                plt.annotate(star, (x_pos0, vs_zero_y), ha='center', size=8, alpha=alpha0, fontweight='bold')
+
+    plt.xticks([1.2, 5.2, 8.4], ['Accuracy', 'Confidence', 'RT'], fontsize=12)
+    plt.xlim(-1, 10)
+    plt.ylim(vs_zero_y - 0.08 * data_range, max_bracket + 0.15 * data_range)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
+    plt.ylabel(r'$r_{same\ subject} - r_{other\ subjects}$ ', fontsize=12, fontweight='bold')
+    plt.title('Correlation consistency (untrained)', fontsize=16, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    _add_control_legend(colors, n_maps)
+    plt.tight_layout()
+    path_name = path / f'corr_btw_bs_untrained_{name}_split_{split_by}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+    # ---- debug: untrained network's same-subject vs other-subjects side by side (not differenced) ----
+    plt.clf()
+    plt.figure(figsize=(7, 4))
+    _plot_same_vs_other_debug(untr_z_raw, n_maps, n_metrics, n_subjs, colors,
+                               x_pos_fn=lambda met_idx, map_idx: met_idx * 4 + map_idx * 0.8)
+    _add_same_other_legend()
+    plt.xticks([1.2, 5.2, 8.4], ['Accuracy', 'Confidence', 'RT'], fontsize=12)
+    plt.xlim(-1, 10)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
+    plt.ylabel(r'$r$', fontsize=12, fontweight='bold')
+    plt.title('Correlation consistency (untrained) - debug: same vs other', fontsize=13, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    path_name = path / f'corr_btw_bs_untrained_{name}_split_{split_by}_debug.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_rank_within_metric_consistency_untrained(standard_data, untrained_data, name, path):
+    """ Untrained-network counterpart of plot_rank_within_metric_consistency. """
+    n_maps = len(untrained_data) + 1
+    n_boots, n_metrics, n_subjs = untrained_data[0].get_corr_results('subj', 'inst', 'subj', 'split').mat.shape
+
+    std_data = np.empty(shape=(n_maps, n_boots, n_metrics))
+    std_data.fill(np.nan)
+    untr_data = np.empty(shape=(n_maps, n_boots, n_metrics))
+    untr_data.fill(np.nan)
+
+    for map_idx in range(n_maps):
+        if map_idx == 0:
+            std_data[map_idx] = standard_data[map_idx].get_rank_results('subj', 'subj', 'split').mat
+            untr_data[map_idx] = untrained_data[map_idx].get_rank_results('subj', 'subj', 'split').mat
+        else:
+            std_mat = standard_data[map_idx-1].get_rank_results('subj', 'inst', 'split').mat
+            try:
+                std_data[map_idx] = std_mat
+            except ValueError:
+                std_data[map_idx, :, :2] = std_mat
+
+            untr_mat = untrained_data[map_idx-1].get_rank_results('subj', 'inst', 'split').mat
+            try:
+                untr_data[map_idx] = untr_mat
+            except ValueError:
+                untr_data[map_idx, :, :2] = untr_mat
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(5, 4))
+
+    for map_idx in range(n_maps):
+        for met_idx in range(n_metrics):
+            if map_idx > 1 and met_idx > 1:
+                continue
+            vals = untr_data[map_idx, :, met_idx]
+            if np.all(np.isnan(vals)):
+                continue
+            x_pos = met_idx * 4 + map_idx * 0.8
+            box = plt.boxplot(vals, positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+            _style_control_boxplot(box, colors(map_idx))
+
+            if map_idx == 0:
+                continue  # Human-Human standard == untrained reference, redundant to show
+            std_vals = std_data[map_idx, :, met_idx]
+            if not np.all(np.isnan(std_vals)):
+                plt.scatter(x_pos + 0.3, np.nanmean(std_vals), marker='*', s=60,
+                            color=colors(map_idx), edgecolor='black', linewidth=0.5, zorder=5)
+
+    data_all = np.concatenate([untr_data[np.isfinite(untr_data)], std_data[np.isfinite(std_data)]])
+    data_min, data_max = np.nanmin(data_all), np.nanmax(data_all)
+    data_range = data_max - data_min
+    max_bracket = data_max
+    min_annot = data_min
+
+    if name == 'mnist':
+        for map_idx in range(1, n_maps):
+            diff = untr_data[0] - untr_data[map_idx]
+            for met_idx in range(n_metrics):
+                for_proportion = diff[:, met_idx]
+                p_val = 2 * min(
+                    len(for_proportion[for_proportion >= 0]) / len(for_proportion),
+                    len(for_proportion[for_proportion < 0]) / len(for_proportion)
+                )
+                ci_lower = np.percentile(for_proportion, 2.5)
+                ci_upper = np.percentile(for_proportion, 97.5)
+                print(f"Comparison: Subject vs {['RTNet', 'AlexNet', 'ResNet18'][map_idx-1]} - "
+                      f"Metric: {['Accuracy', 'Confidence', 'Reaction time'][met_idx]} - "
+                      f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
+                if met_idx == 2 and not (map_idx == 1):
+                    continue
+                x_mid = (met_idx * 4 + met_idx * 4 + map_idx * 0.8) / 2
+                y_max = np.nanmax(untr_data[:, :, met_idx]) + 0.08 * data_range * map_idx
+                max_bracket = max(max_bracket, y_max)
+                alpha = 0.5 if p_val < 0.05 else 1
+                anno = r'$p < 0.001$' if p_val < 0.001 else r'$p = {:.3f}$'.format(p_val)
+                plt.plot([met_idx * 4, met_idx * 4 + map_idx * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
+
+    if name == 'ecoset10':
+        for map_idx in range(1, n_maps):
+            for met_idx in range(n_metrics):
+                for_proportion = untr_data[map_idx, :, met_idx]
+                p_val = 2 * min(
+                    len(for_proportion[for_proportion >= 0]) / len(for_proportion),
+                    len(for_proportion[for_proportion < 0]) / len(for_proportion)
+                )
+                ci_lower = np.percentile(for_proportion, 2.5)
+                ci_upper = np.percentile(for_proportion, 97.5)
+                print(f"Comparison: Subject vs {['RTNet', 'AlexNet', 'ResNet18'][map_idx-1]} - "
+                      f"Metric: {['Accuracy', 'Confidence', 'Reaction time'][met_idx]} - "
+                      f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
+                if met_idx == 2 and not (map_idx == 1):
+                    continue
+                x_pos = (met_idx * 4 + map_idx * 0.8)
+                y_max = np.nanpercentile(untr_data[map_idx, :, met_idx], 0) - 0.08 * data_range
+                min_annot = min(min_annot, y_max)
+                if p_val < 1e-3:
+                    anno = '***'
+                elif p_val < 0.01:
+                    anno = '**'
+                elif p_val < 0.05:
+                    anno = '*'
+                else:
+                    anno = 'n.s.'
+                alpha = 1 if p_val < 0.05 else 0.5
+                plt.annotate(anno, (x_pos, y_max), ha='center', size=9, alpha=alpha, fontweight='bold')
+
+    plt.xticks([1.2, 5.2, 8.4], ['Accuracy', 'Confidence', 'RT'], fontsize=12)
+    plt.ylim(min_annot - 0.08 * data_range, max_bracket + 0.15 * data_range)
+    plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
+    plt.ylabel('Rank consistency metric', fontsize=12)
+    plt.title('Rank consistency (untrained)', fontsize=16, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    _add_control_legend(colors, n_maps)
+    plt.tight_layout()
+    path_name = path / f'rank_btw_bs_untrained_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_corr_across_metric_consistency_untrained(standard_data, untrained_data, name, path, split_by):
+    """ Untrained-network counterpart of plot_corr_across_metric_consistency. """
+    n_maps = len(untrained_data) + 1
+    n_boots, n_pairs, n_subjs = untrained_data[0].get_corr_results('subj', 'inst', 'subj', 'var', split_by).mat.shape
+
+    std_z = np.empty(shape=(2, n_maps, n_pairs, n_subjs))
+    std_z.fill(np.nan)
+    untr_z = np.empty(shape=(2, n_maps, n_pairs, n_subjs))
+    untr_z.fill(np.nan)
+
+    for type_idx, map_type in enumerate(['subj', 'subj_gp']):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                std_mat = standard_data[map_idx].get_corr_results('subj', 'subj', map_type, 'var', split_by).mat
+                std_z[type_idx, map_idx] = np.mean(stat_func.r2z(std_mat, metric='pearson'), axis=0)
+
+                untr_mat = untrained_data[map_idx].get_corr_results('subj', 'subj', map_type, 'var', split_by).mat
+                untr_z[type_idx, map_idx] = np.mean(stat_func.r2z(untr_mat, metric='pearson'), axis=0)
+            else:
+                std_mat = standard_data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'var', split_by).mat
+                std_mat = np.mean(stat_func.r2z(std_mat, metric='pearson'), axis=0)
+                if map_idx > 1 and n_pairs > 1:
+                    std_z[type_idx, map_idx, 0] = std_mat
+                else:
+                    std_z[type_idx, map_idx] = std_mat
+
+                untr_mat = untrained_data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'var', split_by).mat
+                untr_mat = np.mean(stat_func.r2z(untr_mat, metric='pearson'), axis=0)
+                if map_idx > 1 and n_pairs > 1:
+                    untr_z[type_idx, map_idx, 0] = untr_mat
+                else:
+                    untr_z[type_idx, map_idx] = untr_mat
+
+    untr_z_raw = untr_z.copy()  # (2, n_maps, n_pairs, n_subjs), pre-diff, for the debug plot below
+
+    std_z = np.squeeze(-np.diff(std_z, axis=0), axis=0)
+    untr_z = np.squeeze(-np.diff(untr_z, axis=0), axis=0)
+    std_r = stat_func.z2r(std_z, metric='pearson')
+    untr_r = stat_func.z2r(untr_z, metric='pearson')
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(4, 4))
+
+    for map_idx in range(n_maps):
+        for pair_idx in range(n_pairs):
+            vals = untr_r[map_idx, pair_idx, :]
+            if np.all(np.isnan(vals)):
+                continue
+            x_pos = pair_idx * 4 + map_idx * 0.8 if pair_idx < 2 else pair_idx * 3.2 + map_idx * 0.8
+            box = plt.boxplot(vals, positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+            _style_control_boxplot(box, colors(map_idx))
+            for k in range(n_subjs):
+                plt.scatter(x_pos - 0.3, vals[k], color=colors(map_idx), s=5)
+
+            if map_idx == 0:
+                continue  # Human-Human standard == untrained reference, redundant to show
+            std_vals = std_r[map_idx, pair_idx, :]
+            if not np.all(np.isnan(std_vals)):
+                plt.scatter(x_pos + 0.3, np.nanmean(std_vals), marker='*', s=60,
+                            color=colors(map_idx), edgecolor='black', linewidth=0.5, zorder=5)
+
+    data_all = np.concatenate([untr_r[np.isfinite(untr_r)], std_r[np.isfinite(std_r)]])
+    data_min, data_max = np.nanmin(data_all), np.nanmax(data_all)
+    data_range = data_max - data_min
+    vs_zero_y = data_min - 0.15 * data_range
+    max_bracket = data_max
+
+    for pair_idx in range(n_pairs):
+        sub_data = untr_z[:, pair_idx, :]
+        for i in range(sub_data.shape[0]):
+            for j in range(i + 1, sub_data.shape[0]):
+                if map_labels[i] != 'Human-Human':
+                    continue
+                if np.all(np.isnan(sub_data[j])):
+                    continue
+
+                # two-sided: Human-Human vs Human-Model
+                t_stat, p_val = stats.ttest_ind(sub_data[i], sub_data[j], equal_var=False, nan_policy='omit')
+                try:
+                    bayes10 = float(pg.ttest(sub_data[i], sub_data[j], paired=False)['BF10'].values[0])
+                except Exception:
+                    bayes10 = np.nan
+                bayes01 = 1 / bayes10
+                print(f"Pair: {['Accuracy-Confidence', 'Accuracy-Reaction time', 'Reaction time-Confidence'][pair_idx]}, "
+                      f"Comparison: {map_labels[i]} vs {map_labels[j]} - "
+                      f"t-stat: {t_stat:.4f}, p-value: {p_val:.6f}, "
+                      f"BF10: {bayes10:.4f}, BF01: {bayes01:.4f}")
+
+                if pair_idx < 2:
+                    x_mid = (pair_idx * 4 + i * 0.8 + pair_idx * 4 + j * 0.8) / 2
+                    plot_x_pos = [pair_idx * 4, pair_idx * 4 + j * 0.8]
+                else:
+                    x_mid = (pair_idx * 3.2 + i * 0.8 + pair_idx * 3.2 + j * 0.8) / 2
+                    plot_x_pos = [pair_idx * 3.2, pair_idx * 3.2 + j * 0.8]
+
+                y_max = np.nanmax(untr_r[:, pair_idx, :]) + 0.08 * data_range * j
+                max_bracket = max(max_bracket, y_max)
+                alpha = 0.5 if p_val < 0.05 else 1
+                if p_val < 1e-3:
+                    power = int(np.floor(np.log10(p_val)))
+                    coefficient = p_val / (10 ** power)
+                    anno = r"$p = {:.2f} \times 10^{{{}}}$".format(coefficient, power)
+                else:
+                    anno = r"$p = {:.3f}$".format(p_val)
+                plt.plot(plot_x_pos, [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
+
+                # one-sided: Human-Model vs 0
+                t_stat0, p_val0 = stats.ttest_1samp(sub_data[j], 0, alternative='greater', nan_policy='omit')
+                if pair_idx < 2:
+                    x_pos0 = pair_idx * 4 + j * 0.8 + 0.15
+                else:
+                    x_pos0 = pair_idx * 3.2 + j * 0.8 + 0.15
+                if p_val0 < 1e-3:
+                    star = '***'
+                elif p_val0 < 0.01:
+                    star = '**'
+                elif p_val0 < 0.05:
+                    star = '*'
+                else:
+                    star = 'n.s.'
+                alpha0 = 1 if p_val0 < 0.05 else 0.5
+                plt.annotate(star, (x_pos0, vs_zero_y), ha='center', size=8, alpha=alpha0, fontweight='bold')
+
+    plt.xticks([1.2, 4.4, 6.8], ['Acc-Conf', 'Acc-RT', 'Conf-RT'], fontsize=12)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlim(-1, 8.5)
+    plt.ylim(vs_zero_y - 0.08 * data_range, max_bracket + 0.15 * data_range)
+    plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
+    plt.ylabel(r'$r_{same\ subject} - r_{other\ subjects}$ ', fontsize=12, fontweight='bold')
+    plt.title('Correlation consistency (untrained)', fontsize=14, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    _add_control_legend(colors, n_maps)
+    plt.tight_layout()
+    path_name = path / f'corr_btw_var_untrained_{name}_split_{split_by}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+    # ---- debug: untrained network's same-subject vs other-subjects side by side (not differenced) ----
+    plt.clf()
+    plt.figure(figsize=(6, 4))
+    _plot_same_vs_other_debug(
+        untr_z_raw, n_maps, n_pairs, n_subjs, colors,
+        x_pos_fn=lambda pair_idx, map_idx: pair_idx * 4 + map_idx * 0.8 if pair_idx < 2 else pair_idx * 3.2 + map_idx * 0.8
+    )
+    _add_same_other_legend()
+    plt.xticks([1.2, 4.4, 6.8], ['Acc-Conf', 'Acc-RT', 'Conf-RT'], fontsize=12)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlim(-1, 8.5)
+    plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
+    plt.ylabel(r'$r$', fontsize=12, fontweight='bold')
+    plt.title('Correlation consistency (untrained) - debug: same vs other', fontsize=12, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    path_name = path / f'corr_btw_var_untrained_{name}_split_{split_by}_debug.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_rank_across_metric_consistency_untrained(standard_data, untrained_data, name, path):
+    """ Untrained-network counterpart of plot_rank_across_metric_consistency. """
+    n_maps = len(untrained_data) + 1
+    n_boots, n_pairs, n_subjs = untrained_data[0].get_corr_results('subj', 'inst', 'subj', 'var').mat.shape
+
+    std_data = np.empty(shape=(n_maps, n_boots, n_pairs))
+    std_data.fill(np.nan)
+    untr_data = np.empty(shape=(n_maps, n_boots, n_pairs))
+    untr_data.fill(np.nan)
+
+    for map_idx in range(n_maps):
+        if map_idx == 0:
+            std_data[map_idx] = standard_data[map_idx].get_rank_results('subj', 'subj', 'var').mat
+            untr_data[map_idx] = untrained_data[map_idx].get_rank_results('subj', 'subj', 'var').mat
+        else:
+            std_data[map_idx] = standard_data[map_idx-1].get_rank_results('subj', 'inst', 'var').mat
+            untr_data[map_idx] = untrained_data[map_idx-1].get_rank_results('subj', 'inst', 'var').mat
+
+    model_labels = ['Human', 'RTNet', 'AlexNet', 'ResNet18']
+    map_labels = [f'Human-{label}' for label in model_labels]
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(4, 4))
+
+    for map_idx in range(n_maps):
+        for pair_idx in range(n_pairs):
+            if pair_idx != 0 and not (map_idx <= 1):
+                continue
+            x_pos = pair_idx * 4 + map_idx * 0.8 if pair_idx < 2 else pair_idx * 3.2 + map_idx * 0.8
+            box = plt.boxplot(untr_data[map_idx, :, pair_idx], positions=[x_pos], widths=0.4, patch_artist=True, showfliers=False)
+            _style_control_boxplot(box, colors(map_idx))
+
+            if map_idx == 0:
+                continue  # Human-Human standard == untrained reference, redundant to show
+            std_vals = std_data[map_idx, :, pair_idx]
+            plt.scatter(x_pos + 0.3, np.nanmean(std_vals), marker='*', s=60,
+                        color=colors(map_idx), edgecolor='black', linewidth=0.5, zorder=5)
+
+    data_all = np.concatenate([untr_data[np.isfinite(untr_data)], std_data[np.isfinite(std_data)]])
+    data_min, data_max = np.nanmin(data_all), np.nanmax(data_all)
+    data_range = data_max - data_min
+    max_bracket = data_max
+    min_annot = data_min
+
+    if name == 'mnist':
+        for map_idx in range(1, n_maps):
+            diff = untr_data[0] - untr_data[map_idx]
+            for pair_idx in range(n_pairs):
+                if pair_idx != 0 and not (map_idx == 1):
+                    continue
+                for_proportion = diff[:, pair_idx]
+                p_val = 2 * min(
+                    len(for_proportion[for_proportion >= 0]) / len(for_proportion),
+                    len(for_proportion[for_proportion < 0]) / len(for_proportion)
+                )
+                ci_lower = np.percentile(for_proportion, 2.5)
+                ci_upper = np.percentile(for_proportion, 97.5)
+                print(f"Comparison: Subject vs {['RTNet', 'AlexNet', 'ResNet18'][map_idx-1]} - "
+                      f"Pair: {['Accuracy-Confidence', 'Accuracy-Reaction time', 'Reaction time-Confidence'][pair_idx]} - "
+                      f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
+                if pair_idx < 2:
+                    x_mid = (pair_idx * 4 + pair_idx * 4 + map_idx * 0.8) / 2
+                    plot_x_pos = [pair_idx * 4, pair_idx * 4 + map_idx * 0.8]
+                else:
+                    x_mid = (pair_idx * 3.2 + pair_idx * 3.2 + map_idx * 0.8) / 2
+                    plot_x_pos = [pair_idx * 3.2, pair_idx * 3.2 + map_idx * 0.8]
+                y_max = np.nanmax(untr_data[:, :, pair_idx]) + 0.08 * data_range * map_idx
+                max_bracket = max(max_bracket, y_max)
+                alpha = 0.5 if p_val < 0.05 else 1
+                anno = r'$p < 0.001$' if p_val < 0.001 else r'$p = {:.3f}$'.format(p_val)
+                plt.plot(plot_x_pos, [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
+
+    if name == 'ecoset10':
+        for map_idx in range(1, n_maps):
+            for pair_idx in range(n_pairs):
+                if pair_idx != 0 and not (map_idx == 1):
+                    continue
+                for_proportion = untr_data[map_idx, :, pair_idx]
+                p_val = 2 * min(
+                    len(for_proportion[for_proportion >= 0]) / len(for_proportion),
+                    len(for_proportion[for_proportion < 0]) / len(for_proportion)
+                )
+                ci_lower = np.percentile(for_proportion, 2.5)
+                ci_upper = np.percentile(for_proportion, 97.5)
+                print(f"Comparison: Subject vs {['RTNet', 'AlexNet', 'ResNet18'][map_idx-1]} - "
+                      f"Pair: {['Accuracy-Confidence', 'Accuracy-Reaction time', 'Reaction time-Confidence'][pair_idx]} - "
+                      f"p-value: {p_val:.4f}, 95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]")
+                if pair_idx < 2:
+                    x_pos = pair_idx * 4 + map_idx * 0.8
+                else:
+                    x_pos = pair_idx * 3.2 + map_idx * 0.8
+                y_max = min_annot - 0.08 * data_range
+                min_annot = min(min_annot, y_max)
+                if p_val < 1e-3:
+                    anno = '***'
+                elif p_val < 0.01:
+                    anno = '**'
+                elif p_val < 0.05:
+                    anno = '*'
+                else:
+                    anno = 'n.s.'
+                alpha = 1 if p_val < 0.05 else 0.5
+                plt.annotate(anno, (x_pos, y_max), ha='center', size=9, alpha=alpha, fontweight='bold')
+
+    plt.xticks([1.2, 4.4, 6.8], ['Acc-Conf', 'Acc-RT', 'Conf-RT'], fontsize=12)
+    plt.xlim(-1, 8.5)
+    plt.ylim(min_annot - 0.08 * data_range, max_bracket + 0.15 * data_range)
+    plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
+    plt.ylabel('Rank consistency metric', fontsize=12)
+    plt.title('Rank consistency (untrained)', fontsize=14, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    _add_control_legend(colors, n_maps)
+    plt.tight_layout()
+    path_name = path / f'rank_btw_var_untrained_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()

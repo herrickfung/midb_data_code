@@ -103,8 +103,8 @@ def main():
 
     current_path, graph_path = manage_path()
     download_and_extract_data(current_path)
-    standard_maps = init_map(variant='untrained')
-    compute(standard_maps, variant='untrained', load=load)
+    standard_maps = init_map(variant='standard')
+    compute(standard_maps, variant='standard', load=load)
     graph(standard_maps, graph_path)
 
 
