@@ -12,6 +12,12 @@ default_config = {
     'map_category': True,
 }
 
+# subject by stim_label mapping
+cate_map_config = {
+    'bootstrap_iterations': 50,
+    'map_confusion': False,
+    'map_category': False,
+}
 
 def determine_condition(row):
     return_values = {
@@ -46,7 +52,7 @@ def exclude_RT_outliers(data):
     # print(f"Mean: {np.mean(removal_array)}, Min: {np.min(removal_array)}, Max: {np.max(removal_array)}")
     return data
 
-def get_human_on_mnist():
+def get_human_on_mnist(variant: str = 'standard'):
     path = 'dataset/mnist/standard/human.csv'
     data = pd.read_csv(path)
     data['noise'] = ['Low' if x == 'easy' else 'High' for x in data.noise]
@@ -55,12 +61,15 @@ def get_human_on_mnist():
     data['rt'] = data['resp_rt']
     data['conf'] = data['confidence']
     data['subj'] = data['subject']
-    data = data.groupby(['mnist_index', 'sat', 'noise', 'subject', 'repeat']).mean(numeric_only=True).reset_index()
+    if variant == 'category':
+        data = data.groupby(['stim', 'sat', 'noise', 'subject', 'repeat']).mean(numeric_only=True).reset_index()
+    else:
+        data = data.groupby(['mnist_index', 'sat', 'noise', 'subject', 'repeat']).mean(numeric_only=True).reset_index()
     data['cond'] = data.apply(determine_condition, axis = 1)
     return data
 
 
-def get_human_on_ecoset10():
+def get_human_on_ecoset10(variant: str = 'standard'):
     path = 'dataset/ecoset10/standard/human.csv'
     data = pd.read_csv(path)
     data = exclude_RT_outliers(data)
@@ -70,7 +79,10 @@ def get_human_on_ecoset10():
     data['stim'] = data['stim'].map(stim_to_id)
     data['resp'] = data['resp'].map(stim_to_id)
     data['rt'] = data['p_rt']
-    data = data.groupby(['image_index', 'blur', 'subj', 'reps']).mean(numeric_only=True).reset_index()
+    if variant == 'category':
+        data = data.groupby(['stim', 'blur', 'subj', 'reps']).mean(numeric_only=True).reset_index()
+    else:
+        data = data.groupby(['image_index', 'blur', 'subj', 'reps']).mean(numeric_only=True).reset_index()
     data['cond'] = [1 for x in range(len(data))]
     return data
 
@@ -485,3 +497,140 @@ def get_resnet_on_imagenet_n(n):
         'graph_path': f'IndiMap_plots/imagenet16_resnet18_{n}',
     }
     return {**default_config, **config}
+
+def get_rtnet_on_mnist_category_map():
+    human_data = get_human_on_mnist('category')
+    model_data = pd.read_csv(f'dataset/mnist/standard/rtnet.csv')
+    model_data.mnist_index = model_data.mnist_index + 1
+
+    model_data['stim'] = model_data['true label']
+    model_data['resp'] = model_data['choice']
+    model_data['acc'] = model_data['correct']
+    model_data['conf'] = model_data['confidence diff']
+    model_data['inst'] = model_data['model']
+    model_data['cond'] = [1 if x == 'speed focus' else 0 for x in model_data.sat]
+    model_data = model_data.groupby(['stim', 'cond', 'noise', 'inst', 'reps']).mean(numeric_only=True).reset_index()
+    model_data.loc[model_data['resp'].isin([0, 9]), 'resp'] = np.nan
+
+    config = {
+        'task_name': 'mnist',
+        'model_name': 'rtnet',
+        'subj_data': human_data,
+        'inst_data': model_data,
+        'map_variables': ['acc', 'conf', 'rt'],
+        'map_together': 'stim',
+        'map_separate': 'cond',
+        'output_path': f'IndiMap_results/category/mnist_rtnet',
+        'graph_path': f'IndiMap_plots/category/mnist_rtnet',
+    }
+    return {**cate_map_config, **config}
+
+
+def get_alexnet_on_mnist_category_map():
+    human_data = get_human_on_mnist('category')
+    model_data = pd.read_csv(f'dataset/mnist/standard/alexnet.csv')
+    model_data['mnist_index'] = model_data.minst_index + 1
+    model_data['cond'] = [0 if x in [0, 1] else 1 for x in model_data.cond]
+    model_data['conf'] = model_data['top2diff_conf']
+    model_data.loc[model_data['resp'].isin([0, 9]), 'resp'] = np.nan
+    model_data = model_data.groupby(['stim', 'cond', 'noise', 'inst']).mean(numeric_only=True).reset_index()
+
+    config = {
+        'task_name': 'mnist',
+        'model_name': 'alexnet',
+        'subj_data': human_data,
+        'inst_data': model_data,
+        'map_variables': ['acc', 'conf'],
+        'map_together': 'stim',
+        'map_separate': 'cond',
+        'output_path': f'IndiMap_results/category/mnist_alexnet',
+        'graph_path': f'IndiMap_plots/category/mnist_alexnet',
+    }
+    return {**cate_map_config, **config}
+
+
+def get_resnet18_on_mnist_category_map():
+    human_data = get_human_on_mnist('category')
+    model_data = pd.read_csv(f'dataset/mnist/standard/resnet18.csv')
+    model_data['mnist_index'] = model_data.minst_index + 1
+    model_data['cond'] = [0 if x in [0, 1] else 1 for x in model_data.cond]
+    model_data['conf'] = model_data['top2diff_conf']
+    model_data.loc[model_data['resp'].isin([0, 9]), 'resp'] = np.nan
+    model_data = model_data.groupby(['stim', 'cond', 'noise', 'inst']).mean(numeric_only=True).reset_index()
+
+    config = {
+        'task_name': 'mnist',
+        'model_name': 'resnet18',
+        'subj_data': human_data,
+        'inst_data': model_data,
+        'map_variables': ['acc', 'conf'],
+        'map_together': 'stim',
+        'map_separate': 'cond',
+        'output_path': f'IndiMap_results/category/mnist_resnet18',
+        'graph_path': f'IndiMap_plots/category/mnist_resnet18',
+    }
+    return {**cate_map_config, **config}
+
+
+def get_rtnet_on_ecoset10_category_map():
+    human_data = get_human_on_ecoset10('category')
+    model_data = pd.read_csv(f'dataset/ecoset10/standard/rtnet.csv')
+    model_data['conf'] = model_data['conf_top2diff']
+    model_data['cond'] = [1 for x in range(len(model_data))]
+    model_data['resp'] = model_data['resp'].astype(int)
+    model_data = model_data.groupby(['stim', 'cond', 'blur', 'inst', 'rep'], as_index=False).mean(numeric_only=True)
+
+    config = {
+        'task_name': 'ecoset10',
+        'model_name': 'rtnet',
+        'subj_data': human_data,
+        'inst_data': model_data,
+        'map_variables': ['acc', 'conf', 'rt'],
+        'map_together': 'stim',
+        'map_separate': 'cond',
+        'output_path': f'IndiMap_results/category/ecoset10_rtnet',
+        'graph_path': f'IndiMap_plots/category/ecoset10_rtnet',
+    }
+    return {**cate_map_config, **config}
+
+
+def get_alexnet_on_ecoset10_category_map():
+    human_data = get_human_on_ecoset10('category')
+    model_data = pd.read_csv(f'dataset/ecoset10/standard/alexnet.csv')
+    model_data['conf'] = model_data['conf_top2diff']
+    model_data['cond'] = [1 for x in range(len(model_data))]
+    model_data = model_data.groupby(['stim', 'cond', 'blur', 'inst']).mean(numeric_only=True).reset_index()
+
+    config = {
+        'task_name': 'ecoset10',
+        'model_name': 'alexnet',
+        'subj_data': human_data,
+        'inst_data': model_data,
+        'map_variables': ['acc', 'conf'],
+        'map_together': 'stim',
+        'map_separate': 'cond',
+        'output_path': f'IndiMap_results/category/ecoset10_alexnet',
+        'graph_path': f'IndiMap_plots/category/ecoset10_alexnet',
+    }
+    return {**cate_map_config, **config}
+
+
+def get_resnet18_on_ecoset10_category_map():
+    human_data = get_human_on_ecoset10('category')
+    model_data = pd.read_csv(f'dataset/ecoset10/standard/resnet18.csv')
+    model_data['conf'] = model_data['conf_top2diff']
+    model_data['cond'] = [1 for x in range(len(model_data))]
+    model_data = model_data.groupby(['stim', 'cond', 'blur', 'inst']).mean(numeric_only=True).reset_index()
+
+    config = {
+        'task_name': 'ecoset10',
+        'model_name': 'resnet18',
+        'subj_data': human_data,
+        'inst_data': model_data,
+        'map_variables': ['acc', 'conf'],
+        'map_together': 'stim',
+        'map_separate': 'cond',
+        'output_path': f'IndiMap_results/category/ecoset10_resnet18',
+        'graph_path': f'IndiMap_plots/category/ecoset10_resnet18',
+    }
+    return {**cate_map_config, **config}

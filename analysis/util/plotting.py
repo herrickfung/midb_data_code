@@ -882,6 +882,12 @@ def plot_top_identifiability(data, name, path):
                             color=colors(map), s=5
                             )
 
+    data_min = np.nanmin(plot_data_in_r)
+    data_max = np.nanmax(plot_data_in_r)
+    data_range = data_max - data_min
+    vs_zero_y = data_min - 0.15 * data_range
+    max_bracket = data_max
+
     for met in range(n_metrics):
         sub_data = plot_data[:, met, :]
         for i in range(sub_data.shape[0]):
@@ -909,6 +915,7 @@ def plot_top_identifiability(data, name, path):
                             continue
                         x_mid = (met * 4 + i * 0.8 + met * 4 + j * 0.8) / 2  # Midpoint between bars
                         y_max = max(np.nanmax(plot_data_in_r[:, met, :]), np.nanmax(plot_data_in_r[:, met, :])) + 0.1 * abs(j - i)
+                        max_bracket = max(max_bracket, y_max)
                         if p_val < 0.05:
                             alpha = 0.5
                         else:
@@ -921,7 +928,6 @@ def plot_top_identifiability(data, name, path):
                             anno = r"$p = {:.3f}$".format(p_val)
                         plt.plot([met * 4 + i * 0.8, met * 4 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
                         plt.annotate(anno, (x_mid, y_max+0.02), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
-                        plt.ylim(-0.3, 0.75)
                         plt.legend(loc='upper right', fontsize=8, frameon=False)
 
                 if name in ['mnist', 'ecoset10']:
@@ -943,7 +949,7 @@ def plot_top_identifiability(data, name, path):
                         if met == 2 and not (map_labels[i] == 'Human-Human' and map_labels[j] == 'Human-RTNet'):
                             continue
                         x_pos = (met * 4 + j * 0.8) + 0.15
-                        y_max = -0.2
+                        y_max = vs_zero_y
                         if p_val < 1e-3:
                             anno = '***'
                             alpha = 1
@@ -959,11 +965,12 @@ def plot_top_identifiability(data, name, path):
                         plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha, fontweight='bold')
                         plt.legend(loc='upper left', fontsize=8, frameon=False)
 
-    plt.xticks([1.2, 5.2, 8.4], 
+    plt.xticks([1.2, 5.2, 8.4],
                 ['Accuracy', 'Confidence', 'RT'],
                 fontsize=12
             )
     plt.xlim(-1, 10)
+    plt.ylim(vs_zero_y - 0.08 * data_range, max_bracket + 0.15 * data_range)
     plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
     plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
     plt.ylabel(r'$r_{best\ pair} - r_{other\ pairs}$ ', fontsize=12, fontweight='bold')
@@ -1049,6 +1056,12 @@ def plot_corr_within_metric_consistency(data, name, path, split_by):
                             color=colors(map), s=5
                             )
 
+    data_min = np.nanmin(plot_data_in_r)
+    data_max = np.nanmax(plot_data_in_r)
+    data_range = data_max - data_min
+    vs_zero_y = data_min - 0.15 * data_range
+    max_bracket = data_max
+
     for met in range(n_metrics):
         sub_data = plot_data[:, met, :]
         for i in range(sub_data.shape[0]):
@@ -1076,6 +1089,7 @@ def plot_corr_within_metric_consistency(data, name, path, split_by):
                             continue
                         x_mid = (met * 4 + i * 0.8 + met * 4 + j * 0.8) / 2  # Midpoint between bars
                         y_max = max(np.nanmax(plot_data_in_r[:, met, :]), np.nanmax(plot_data_in_r[:, met, :])) + 0.1 * abs(j - i)
+                        max_bracket = max(max_bracket, y_max)
                         if p_val < 0.05:
                             alpha = 0.5
                         else:
@@ -1088,7 +1102,6 @@ def plot_corr_within_metric_consistency(data, name, path, split_by):
                             anno = r"$p = {:.3f}$".format(p_val)
                         plt.plot([met * 4 + i * 0.8, met * 4 + j * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
                         plt.annotate(anno, (x_mid, y_max+0.02), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
-                        plt.ylim(-0.4, 1.3)
                         plt.legend(loc='upper right', fontsize=8, frameon=False)
 
                 if name in ['mnist', 'ecoset10']:
@@ -1110,7 +1123,7 @@ def plot_corr_within_metric_consistency(data, name, path, split_by):
                         if met == 2 and not (map_labels[i] == 'Human-Human' and map_labels[j] == 'Human-RTNet'):
                             continue
                         x_pos = (met * 4 + j * 0.8) + 0.15
-                        y_max = -0.2
+                        y_max = vs_zero_y
                         if p_val < 1e-3:
                             anno = '***'
                             alpha = 1
@@ -1126,11 +1139,12 @@ def plot_corr_within_metric_consistency(data, name, path, split_by):
                         plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha, fontweight='bold')
                         plt.legend(loc='upper left', fontsize=8, frameon=False)
 
-    plt.xticks([1.2, 5.2, 8.4], 
+    plt.xticks([1.2, 5.2, 8.4],
                 ['Accuracy', 'Confidence', 'RT'],
                 fontsize=12
             )
     plt.xlim(-1, 10)
+    plt.ylim(vs_zero_y - 0.08 * data_range, max_bracket + 0.15 * data_range)
     plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
     plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
     plt.ylabel(r'$r_{same\ subject} - r_{other\ subjects}$ ', fontsize=12, fontweight='bold')
@@ -1201,6 +1215,12 @@ def plot_rank_within_metric_consistency(data, name, path):
                 median.set_linewidth(2.5)
                 median.set_alpha(1)
 
+    data_min = np.nanmin(plot_data)
+    data_max = np.nanmax(plot_data)
+    data_range = data_max - data_min
+    max_bracket = data_max
+    min_annot = data_min
+
     # compute stats using bootstrapping test
     if name == 'mnist':
         for map in range(1, n_maps):
@@ -1219,8 +1239,8 @@ def plot_rank_within_metric_consistency(data, name, path):
                 if met == 2 and not (map == 1):
                     continue
                 x_mid = (met * 4 + met * 4 + map * 0.8) / 2  # Midpoint between bars
-                y_max = max(np.nanmax(plot_data[:, :, met]), np.nanmax(plot_data[:, :, met])) - 18 + 20 * map
-                # y_max = np.nanmean(plot_data[:, :, met]) + p_bar_pos * abs(map - 0)
+                y_max = np.nanmax(plot_data[:, :, met]) + 0.08 * data_range * map
+                max_bracket = max(max_bracket, y_max)
                 if p_val < 0.05:
                     alpha = 0.5
                 else:
@@ -1230,7 +1250,7 @@ def plot_rank_within_metric_consistency(data, name, path):
                 else:
                     anno = r'$p = {:.3f}$'.format(p_val)
                 plt.plot([met * 4, met * 4 + map * 0.8], [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
-                plt.annotate(anno, (x_mid, y_max+p_val_pos), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
 
     if name == 'ecoset10':
         for _map in range(1, n_maps):
@@ -1248,7 +1268,8 @@ def plot_rank_within_metric_consistency(data, name, path):
                 if met == 2 and not (_map == 1):
                     continue
                 x_pos = (met * 4 + _map * 0.8)
-                y_max = np.nanpercentile(plot_data[_map, :, met], 0) - 10
+                y_max = np.nanpercentile(plot_data[_map, :, met], 0) - 0.08 * data_range
+                min_annot = min(min_annot, y_max)
                 if p_val < 1e-3:
                     anno = '***'
                     alpha = 1
@@ -1261,17 +1282,17 @@ def plot_rank_within_metric_consistency(data, name, path):
                 else:
                     anno = 'n.s.'
                     alpha = 0.5
-                plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha, fontweight='bold')  
-                plt.ylim(-24, 180)
+                plt.annotate(anno, (x_pos, y_max), ha='center', size=9, alpha=alpha, fontweight='bold')
 
 
-    plt.xticks([1.2, 5.2, 8.4], 
+    plt.xticks([1.2, 5.2, 8.4],
                 ['Accuracy', 'Confidence', 'RT'],
                 fontsize=12
             )
+    plt.ylim(min_annot - 0.08 * data_range, max_bracket + 0.15 * data_range)
     plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
     plt.ylabel('Rank consistency metric', fontsize=12)
-    plt.title('Rank consistency', fontsize=16, fontweight='bold')  
+    plt.title('Rank consistency', fontsize=16, fontweight='bold')
     plt.legend(loc='best', fontsize=8, frameon=False)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
@@ -1357,6 +1378,12 @@ def plot_corr_across_metric_consistency(data, name, path, split_by):
                             color=colors(map), s=5
                             )
 
+    data_min = np.nanmin(plot_data_in_r)
+    data_max = np.nanmax(plot_data_in_r)
+    data_range = data_max - data_min
+    vs_zero_y = data_min - 0.15 * data_range
+    max_bracket = data_max
+
     for met in range(n_metrics):
         sub_data = plot_data[:, met, :]
         for i in range(sub_data.shape[0]):
@@ -1382,6 +1409,7 @@ def plot_corr_across_metric_consistency(data, name, path, split_by):
                         if met != 0 and not (map_labels[i] == 'Human-Human' and map_labels[j] == 'Human-RTNet'):
                             continue
                         y_max = max(np.nanmax(plot_data_in_r[:, met, :]), np.nanmax(plot_data_in_r[:, met, :])) + 0.1 * abs(j - i)
+                        max_bracket = max(max_bracket, y_max)
                         if met < 2:
                             x_mid = (met * 4 + i * 0.8 + met * 4 + j * 0.8) / 2  # Midpoint between bars
                             plot_x_pos = [met * 4, met * 4 + j * 0.8]
@@ -1401,7 +1429,6 @@ def plot_corr_across_metric_consistency(data, name, path, split_by):
                             anno = r"$p = {:.3f}$".format(p_val)
                         plt.plot(plot_x_pos, [y_max, y_max], color='black', linewidth=1.5,alpha=alpha)
                         plt.annotate(anno, (x_mid, y_max+0.02), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
-                        plt.ylim(-0.4, 1.19)
 
                 if name in ['mnist', 'ecoset10']:
                     t_stat, p_val = stats.ttest_1samp(sub_data[j], 0, nan_policy='omit')
@@ -1426,9 +1453,9 @@ def plot_corr_across_metric_consistency(data, name, path, split_by):
                             continue
                         if met < 2:
                             x_pos = met * 4 + j * 0.8 + 0.15
-                        else: 
+                        else:
                             x_pos = met * 3.2 + j * 0.8 + 0.15
-                        y_max = -0.18
+                        y_max = vs_zero_y
                         if p_val < 1e-3:
                             anno = '***'
                             alpha = 1
@@ -1442,18 +1469,18 @@ def plot_corr_across_metric_consistency(data, name, path, split_by):
                             anno = 'n.s.'
                             alpha = 0.5
                         plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=8, alpha=alpha, fontweight='bold')
-                        plt.ylim(-0.4, 1.19)
 
-    plt.xticks([1.2, 4.4, 6.8], 
+    plt.xticks([1.2, 4.4, 6.8],
                 ['Acc-Conf', 'Acc-RT', 'Conf-RT'],
                 fontsize=12
             )
     plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
     plt.xlim(-1, 8.5)
+    plt.ylim(vs_zero_y - 0.08 * data_range, max_bracket + 0.15 * data_range)
 
     plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
     plt.ylabel(r'$r_{same\ subject} - r_{other\ subjects}$ ', fontsize=12, fontweight='bold')
-    plt.title('Correlation consistency', fontsize=14, fontweight='bold')  
+    plt.title('Correlation consistency', fontsize=14, fontweight='bold')
     plt.legend(loc='upper right', fontsize=8, frameon=False)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
@@ -1526,6 +1553,20 @@ def plot_rank_across_metric_consistency(data, name, path):
                 median.set_alpha(1)
             
 
+    # only consider the values actually rendered above (met==0 for any map, or
+    # met>0 restricted to map<=1) - other entries may hold broadcast junk
+    render_mask = np.zeros_like(plot_data, dtype=bool)
+    for map in range(n_maps):
+        for met in range(n_metrics):
+            if met != 0 and not (map <= 1):
+                continue
+            render_mask[map, :, met] = True
+    data_min = np.nanmin(plot_data[render_mask])
+    data_max = np.nanmax(plot_data[render_mask])
+    data_range = data_max - data_min
+    max_bracket = data_max
+    min_annot = data_min
+
     if name == 'mnist':
         # compute stats using bootstrapping test
         for map in range(1, n_maps):
@@ -1549,15 +1590,15 @@ def plot_rank_across_metric_consistency(data, name, path):
                 else:
                     x_mid = (met * 3.2 + met * 3.2 + map * 0.8) / 2  # Midpoint between bars
                     plot_x_pos = [met * 3.2, met * 3.2 + map * 0.8]
-                # y_max = np.nanmax(plot_data[:, :, met]) + p_bar_pos * abs(map - 0) - 20
-                y_max = np.nanmax(plot_data[:, :, met]) + p_bar_pos * abs(map - 0) * 0.8 - 5
+                y_max = np.nanmax(plot_data[:, :, met]) + 0.08 * data_range * map
+                max_bracket = max(max_bracket, y_max)
                 alpha = 1
                 if p_val < 0.001:
                     anno = r'$p < 0.001$'
                 else:
                     anno = r'$p = {:.3f}$'.format(p_val)
                 plt.plot(plot_x_pos, [y_max, y_max], color='black', linewidth=1.5, alpha=alpha)
-                plt.annotate(anno, (x_mid, y_max+p_val_pos), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha)
+                plt.annotate(anno, (x_mid, y_max), textcoords="offset points", xytext=(0, 3), ha='center', size=9, alpha=alpha)
 
     if name == 'ecoset10':
         for _map in range(1, n_maps):
@@ -1578,7 +1619,8 @@ def plot_rank_across_metric_consistency(data, name, path):
                     x_pos = (met * 4 + _map * 0.8)
                 else:
                     x_pos = (met * 3.2 + _map * 0.8)
-                y_max = -5
+                y_max = min_annot - 0.08 * data_range
+                min_annot = min(min_annot, y_max)
                 if p_val < 1e-3:
                     anno = '***'
                     alpha = 1
@@ -1591,18 +1633,18 @@ def plot_rank_across_metric_consistency(data, name, path):
                 else:
                     anno = 'n.s.'
                     alpha = 0.5
-                plt.annotate(anno, (x_pos, y_max), textcoords="offset points", xytext=(0, 1), ha='center', size=10, alpha=alpha, fontweight='bold')  
-                plt.ylim(-9, 110)
+                plt.annotate(anno, (x_pos, y_max), ha='center', size=9, alpha=alpha, fontweight='bold')
 
-    plt.xticks([1.2, 4.4, 6.8], 
+    plt.xticks([1.2, 4.4, 6.8],
                 ['Acc-Conf', 'Acc-RT', 'Conf-RT'],
                 fontsize=12
             )
     plt.xlim(-1, 8.5)
+    plt.ylim(min_annot - 0.08 * data_range, max_bracket + 0.15 * data_range)
 
     plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
     plt.ylabel('Rank consistency metric', fontsize=12)
-    plt.title('Rank consistency', fontsize=14, fontweight='bold')  
+    plt.title('Rank consistency', fontsize=14, fontweight='bold')
     plt.legend(loc='upper right', fontsize=8, frameon=False)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
