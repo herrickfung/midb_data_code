@@ -55,13 +55,15 @@ def compute(all_maps, variant='standard', load=False):
         # obj.dims_map._convert_data_array()
         obj.compute_corr(load_exists=load)
         obj.compute_rank(load_exists=load)
-        obj.compute_top(load_exists=load)
+        # obj.compute_top(load_exists=load)
     # pass
 
 
 def graph(all_data, path):
     """ Plot figures """
     mnists, ecosets = all_data[:3], all_data[3:]
+    path = path / 'standard'
+    path.mkdir(parents=True, exist_ok=True)
     for expt in ['mnist', 'ecoset10']:
         if expt == 'mnist':
             data = mnists
@@ -78,13 +80,19 @@ def graph(all_data, path):
         # plotting.plot_across_metric_illustration(map_mat, expt, path)
         # plotting.plot_best_count_distribution(data, expt, path)
 
-        plotting.plot_top_identifiability(data, expt, path)
-        plotting.plot_corr_within_metric_consistency(data, expt, path, split_by='rand')
-        plotting.plot_corr_within_metric_consistency(data, expt, path, split_by='cate')
-        plotting.plot_rank_within_metric_consistency(data, expt, path)
-        plotting.plot_corr_across_metric_consistency(data, expt, path, split_by='rand')
-        plotting.plot_corr_across_metric_consistency(data, expt, path, split_by='cate')
-        plotting.plot_rank_across_metric_consistency(data, expt, path)
+        # plotting.plot_top_identifiability(data, expt, path)
+        # plotting.plot_corr_within_metric_consistency(data, expt, path, split_by='rand')
+        # plotting.plot_corr_within_metric_consistency(data, expt, path, split_by='cate')
+        # plotting.plot_corr_within_metric_consistency_same_vs_other(data, expt, path, split_by='cate')
+        # plotting.plot_corr_within_metric_consistency_same_vs_other(data, expt, path, split_by='rand')
+        plotting.plot_rank_within_metric_consistency(data, expt, path, split_by='rand')
+        plotting.plot_rank_within_metric_consistency(data, expt, path, split_by='cate')
+        # plotting.plot_corr_across_metric_consistency(data, expt, path, split_by='rand')
+        # plotting.plot_corr_across_metric_consistency(data, expt, path, split_by='cate')
+        # plotting.plot_corr_across_metric_consistency_same_vs_other(data, expt, path, split_by='rand')
+        # plotting.plot_corr_across_metric_consistency_same_vs_other(data, expt, path, split_by='cate')
+        plotting.plot_rank_across_metric_consistency(data, expt, path, split_by='rand')
+        plotting.plot_rank_across_metric_consistency(data, expt, path, split_by='cate')
 
         # raw_pred = plotting.plot_within_metric_prediction_raw(data, expt, path)
         # plotting.plot_within_metric_prediction_diff(raw_pred, expt, path)

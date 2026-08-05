@@ -1157,19 +1157,19 @@ def plot_corr_within_metric_consistency(data, name, path, split_by):
     plt.close()
 
 
-def plot_rank_within_metric_consistency(data, name, path):
+def plot_rank_within_metric_consistency(data, name, path, split_by):
     n_maps = len(data) + 1
-    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'split').mat.shape
+    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'split', split_by).mat.shape
 
     # plot rank consistency
     plot_data = np.empty(shape=(n_maps, n_boots, n_metrics))
     plot_data.fill(np.nan)
     for map_idx in range(n_maps):
         if map_idx == 0:
-            map_data = data[map_idx].get_rank_results('subj', 'subj', 'split').mat
+            map_data = data[map_idx].get_rank_results('subj', 'subj', 'split', split_by).mat
             plot_data[map_idx] = map_data
         else:
-            map_data = data[map_idx-1].get_rank_results('subj', 'inst', 'split').mat
+            map_data = data[map_idx-1].get_rank_results('subj', 'inst', 'split', split_by).mat
             try:
                 plot_data[map_idx] = map_data
             except ValueError:
@@ -1297,7 +1297,7 @@ def plot_rank_within_metric_consistency(data, name, path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    path_name = path / f'rank_btw_bs_{name}.png'
+    path_name = path / f'rank_btw_bs_{name}_split_{split_by}.png'
     plt.savefig(path_name, dpi=384, transparent=True)
     plt.close()
 
@@ -1490,19 +1490,19 @@ def plot_corr_across_metric_consistency(data, name, path, split_by):
     plt.close()
 
 
-def plot_rank_across_metric_consistency(data, name, path):
+def plot_rank_across_metric_consistency(data, name, path, split_by):
     n_maps = len(data) + 1
-    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'var').mat.shape
+    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'var', split_by).mat.shape
 
     # plot rank consistency
     plot_data = np.empty(shape=(n_maps, n_boots, n_metrics))
     plot_data.fill(np.nan)
     for map_idx in range(n_maps):
         if map_idx == 0:
-            map_data = data[map_idx].get_rank_results('subj', 'subj', 'var').mat
+            map_data = data[map_idx].get_rank_results('subj', 'subj', 'var', split_by).mat
             plot_data[map_idx] = map_data
         else:
-            map_data = data[map_idx-1].get_rank_results('subj', 'inst', 'var').mat
+            map_data = data[map_idx-1].get_rank_results('subj', 'inst', 'var', split_by).mat
             if map_idx > 1 and n_metrics > 1:
                 plot_data[map_idx, :] = map_data
             else:
@@ -1649,7 +1649,7 @@ def plot_rank_across_metric_consistency(data, name, path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    path_name = path / f'rank_btw_var_{name}.png'
+    path_name = path / f'rank_btw_var_{name}_split_{split_by}.png'
     plt.savefig(path_name, dpi=384, transparent=True)
     plt.close()
 
@@ -2802,7 +2802,7 @@ def _add_same_other_legend():
     plt.legend(handles=legend_elements, loc='upper right', fontsize=8, frameon=False)
 
 
-def _plot_same_vs_other_debug(untr_z_raw, n_maps, n_groups, n_subjs, colors, x_pos_fn):
+def _plot_same_vs_other_debug(untr_z_raw, n_maps, n_groups, n_subjs, colors, x_pos_fn, dot_offset=0.0):
     """ Debug scatter+box of the untrained network's raw same-subject vs
     other-subjects values (pre-diff, in r-space), side by side per group. """
     same_other_r = stat_func.z2r(untr_z_raw, metric='pearson')  # (2, n_maps, n_groups, n_subjs)
@@ -2819,7 +2819,7 @@ def _plot_same_vs_other_debug(untr_z_raw, n_maps, n_groups, n_subjs, colors, x_p
                     for patch in box['boxes']:
                         patch.set_hatch('///')
                 for k in range(n_subjs):
-                    plt.scatter(x_pos, vals[k], color=colors(map_idx), s=4, alpha=0.6, zorder=3)
+                    plt.scatter(x_pos - dot_offset, vals[k], color=colors(map_idx), s=4, alpha=0.6, zorder=3)
 
 
 def plot_corr_within_metric_consistency_control(standard_data, merged_control, name, path, split_by):
@@ -4077,5 +4077,108 @@ def plot_rank_across_metric_consistency_untrained(standard_data, untrained_data,
     _add_control_legend(colors, n_maps)
     plt.tight_layout()
     path_name = path / f'rank_btw_var_untrained_{name}.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_corr_within_metric_consistency_same_vs_other(data, name, path, split_by):
+    """ Debug variant of plot_corr_within_metric_consistency.
+
+    Instead of plotting the same-subject-minus-other-subjects difference,
+    plots the raw same-subject and other-subjects correlation values side by
+    side (in r-space), so the two components of the difference can be
+    inspected independently. Mirrors the same/other debug plot used for the
+    untrained-network analysis, applied here to the standard network.
+    """
+    n_maps = len(data) + 1
+    n_boots, n_metrics, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'split', split_by=split_by).mat.shape
+
+    plot_z = np.empty(shape=(2, n_maps, n_metrics, n_subjs))
+    plot_z.fill(np.nan)
+
+    for type_idx, map_type in enumerate(['subj', 'subj_gp']):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                map_data = data[map_idx].get_corr_results('subj', 'subj', map_type, 'split', split_by=split_by).mat
+                map_data = np.nanmean(stat_func.r2z(map_data, metric='pearson'), axis=0)
+                plot_z[type_idx, map_idx] = map_data
+            else:
+                map_data = data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'split', split_by=split_by).mat
+                map_data = np.nanmean(stat_func.r2z(map_data, metric='pearson'), axis=0)
+                try:
+                    plot_z[type_idx, map_idx] = map_data
+                except ValueError:
+                    plot_z[type_idx, map_idx, :2] = map_data
+
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(7, 4))
+    _plot_same_vs_other_debug(plot_z, n_maps, n_metrics, n_subjs, colors,
+                               x_pos_fn=lambda met_idx, map_idx: met_idx * 4 + map_idx * 0.8,
+                               dot_offset=0.15)
+    _add_same_other_legend()
+    plt.xticks([1.2, 5.2, 8.4], ['Accuracy', 'Confidence', 'RT'], fontsize=12)
+    plt.xlim(-1, 10)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlabel('Behavioral metrics', fontsize=14, fontweight='bold')
+    plt.ylabel(r'$r$', fontsize=12, fontweight='bold')
+    plt.title('Correlation consistency - debug: same vs other', fontsize=13, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    path_name = path / f'corr_btw_bs_{name}_split_{split_by}_same_vs_other.png'
+    plt.savefig(path_name, dpi=384, transparent=True)
+    plt.close()
+
+
+def plot_corr_across_metric_consistency_same_vs_other(data, name, path, split_by):
+    """ Debug variant of plot_corr_across_metric_consistency.
+
+    Instead of plotting the same-subject-minus-other-subjects difference,
+    plots the raw same-subject and other-subjects correlation values side by
+    side (in r-space), so the two components of the difference can be
+    inspected independently.
+    """
+    n_maps = len(data) + 1
+    n_boots, n_pairs, n_subjs = data[0].get_corr_results('subj', 'inst', 'subj', 'var', split_by).mat.shape
+
+    plot_z = np.empty(shape=(2, n_maps, n_pairs, n_subjs))
+    plot_z.fill(np.nan)
+
+    for type_idx, map_type in enumerate(['subj', 'subj_gp']):
+        for map_idx in range(n_maps):
+            if map_idx == 0:
+                map_data = data[map_idx].get_corr_results('subj', 'subj', map_type, 'var', split_by).mat
+                map_data = np.mean(stat_func.r2z(map_data, metric='pearson'), axis=0)
+                plot_z[type_idx, map_idx] = map_data
+            else:
+                map_data = data[map_idx-1].get_corr_results('subj', 'inst', map_type, 'var', split_by).mat
+                map_data = np.mean(stat_func.r2z(map_data, metric='pearson'), axis=0)
+                if map_idx > 1 and n_pairs > 1:
+                    plot_z[type_idx, map_idx, 0] = map_data
+                else:
+                    plot_z[type_idx, map_idx] = map_data
+
+    colors = plt.cm.get_cmap('Set1', 8)
+
+    plt.clf()
+    plt.figure(figsize=(6, 4))
+    _plot_same_vs_other_debug(
+        plot_z, n_maps, n_pairs, n_subjs, colors,
+        x_pos_fn=lambda pair_idx, map_idx: pair_idx * 4 + map_idx * 0.8 if pair_idx < 2 else pair_idx * 3.2 + map_idx * 0.8,
+        dot_offset=0.15
+    )
+    _add_same_other_legend()
+    plt.xticks([1.2, 4.4, 6.8], ['Acc-Conf', 'Acc-RT', 'Conf-RT'], fontsize=12)
+    plt.axhline(0, color='black', linestyle='dotted', linewidth=1.5, alpha=0.75)
+    plt.xlim(-1, 8.5)
+    plt.xlabel('Pairs of behavioral metrics', fontsize=12, fontweight='bold')
+    plt.ylabel(r'$r$', fontsize=12, fontweight='bold')
+    plt.title('Correlation consistency - debug: same vs other', fontsize=12, fontweight='bold')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    path_name = path / f'corr_btw_var_{name}_split_{split_by}_same_vs_other.png'
     plt.savefig(path_name, dpi=384, transparent=True)
     plt.close()

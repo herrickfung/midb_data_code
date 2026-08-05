@@ -7,6 +7,8 @@ analysis/midb_data.tar.gz
 
 # macOS
 .DS_Store
+.claude
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
