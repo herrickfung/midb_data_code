@@ -57,11 +57,16 @@ def compute(all_maps, load=True):
 def graph(all_maps, path):
     """ Plot accuracy-control figures """
     plotting.plot_corr_within_metric_consistency_accuracy_control(all_maps, SDS, path, split_by='rand')
-    plotting.plot_corr_within_metric_consistency_accuracy_control(all_maps, SDS, path, split_by='cate')
+    # plotting.plot_corr_within_metric_consistency_accuracy_control(all_maps, SDS, path, split_by='cate')
     plotting.plot_rank_within_metric_consistency_accuracy_control(all_maps, SDS, path)
     plotting.plot_corr_across_metric_consistency_accuracy_control(all_maps, SDS, path, split_by='rand')
-    plotting.plot_corr_across_metric_consistency_accuracy_control(all_maps, SDS, path, split_by='cate')
+    # plotting.plot_corr_across_metric_consistency_accuracy_control(all_maps, SDS, path, split_by='cate')
     plotting.plot_rank_across_metric_consistency_accuracy_control(all_maps, SDS, path)
+    plotting.plot_corr_within_metric_consistency_accuracy_control_grouped(all_maps, SDS, path, split_by='rand')
+    plotting.plot_rank_within_metric_consistency_accuracy_control_grouped(all_maps, SDS, path)
+    plotting.plot_corr_across_metric_consistency_accuracy_control_grouped(all_maps, SDS, path, split_by='rand')
+    plotting.plot_rank_across_metric_consistency_accuracy_control_grouped(all_maps, SDS, path)
+    plotting.plot_corr_sd_matrix_consistency_accuracy_control(all_maps, SDS, path, split_by='rand')
 
 
 def main():

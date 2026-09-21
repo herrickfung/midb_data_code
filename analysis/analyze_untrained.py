@@ -63,13 +63,14 @@ def graph(untrained_maps, standard_maps, path):
             untrained_data, standard_data = untrained_ecoset, standard_ecoset
 
         # plotting.plot_raw_matrix(untrained_data, expt, path)
-        plotting.plot_top_identifiability_untrained(standard_data, untrained_data, expt, path)
-        plotting.plot_corr_within_metric_consistency_untrained(standard_data, untrained_data, expt, path, split_by='rand')
-        plotting.plot_corr_within_metric_consistency_untrained(standard_data, untrained_data, expt, path, split_by='cate')
-        plotting.plot_rank_within_metric_consistency_untrained(standard_data, untrained_data, expt, path)
-        plotting.plot_corr_across_metric_consistency_untrained(standard_data, untrained_data, expt, path, split_by='rand')
-        plotting.plot_corr_across_metric_consistency_untrained(standard_data, untrained_data, expt, path, split_by='cate')
-        plotting.plot_rank_across_metric_consistency_untrained(standard_data, untrained_data, expt, path)
+        # plotting.plot_top_identifiability_untrained(standard_data, untrained_data, expt, path)
+
+        # Human vs RTNet only (drop AlexNet/ResNet18), random split only
+        rtnet_untrained, rtnet_standard = untrained_data[:1], standard_data[:1]
+        plotting.plot_corr_within_metric_consistency_untrained(rtnet_standard, rtnet_untrained, expt, path, split_by='rand')
+        plotting.plot_rank_within_metric_consistency_untrained(rtnet_standard, rtnet_untrained, expt, path)
+        plotting.plot_corr_across_metric_consistency_untrained(rtnet_standard, rtnet_untrained, expt, path, split_by='rand')
+        plotting.plot_rank_across_metric_consistency_untrained(rtnet_standard, rtnet_untrained, expt, path)
 
 
 def main():

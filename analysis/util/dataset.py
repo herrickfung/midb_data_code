@@ -112,10 +112,13 @@ def get_human_on_mnist(variant: str = 'standard'):
     data['rt'] = data['resp_rt']
     data['conf'] = data['confidence']
     data['subj'] = data['subject']
+    data['reps'] = data['repeat']
     if variant == 'category':
         data = data.groupby(['stim', 'sat', 'noise', 'subject', 'repeat']).mean(numeric_only=True).reset_index()
-    else:
+    elif variant == 'repeat':
         data = data.groupby(['mnist_index', 'sat', 'noise', 'subject', 'repeat']).mean(numeric_only=True).reset_index()
+    else:
+        data = data.groupby(['mnist_index', 'sat', 'noise', 'subject']).mean(numeric_only=True).reset_index()
     data['cond'] = data.apply(determine_condition, axis = 1)
     return data
 
@@ -132,8 +135,10 @@ def get_human_on_ecoset10(variant: str = 'standard'):
     data['rt'] = data['p_rt']
     if variant == 'category':
         data = data.groupby(['stim', 'blur', 'subj', 'reps']).mean(numeric_only=True).reset_index()
-    else:
+    elif variant == 'repeat':
         data = data.groupby(['image_index', 'blur', 'subj', 'reps']).mean(numeric_only=True).reset_index()
+    else:
+        data = data.groupby(['image_index', 'blur', 'subj']).mean(numeric_only=True).reset_index()
     data['cond'] = [1 for x in range(len(data))]
     return data
 
