@@ -42,7 +42,7 @@ source ./venv/bin/activate
 6. pingouin==0.5.5
 7. seaborn==0.13.2
 8. requests==2.32.5
-9. [indimap](https://github.com/herrickfung/indimap)==0.1.1
+9. [indimap](https://github.com/herrickfung/indimap)==0.1.2
 
 To install these dependencies, 
 ```bash
@@ -55,15 +55,41 @@ pip install -r requirements.txt
 
 The repository includes the following structure:
 
-- **`analysis/`**: Contains all code for reproducing the results and figures. 
-     - By default, running `python3 analyze.py` downloads the data (hosted long-term on [OSF](https://osf.io/n6m7b/files/dqc9s); no manual download is needed), loads precomputed results and generates the figures reported in the paper. 
-     - To recompute all results from raw data, pass the `--recompute` flag. This will take about 30 minutes.
+- **`analysis/`**: Contains all code for reproducing the results and figures (see [Reproducing the analyses](#reproducing-the-analyses) below).
+     - `analyze.py`: single entry point for all analyses.
+     - `util/dataset.py`: loads and preprocesses the human and ANN data into IndiMap configurations.
+     - `util/plotting.py`: plotting and statistics for every figure in the paper.
 
 - **`human_expt/`**: Contains all code for the 10-choice blurry object recognition experiment that run in a web browser, programmed in JS with jsPsych 7.3.3
 
 - **`model_script/`**: Contains all code for training and testing multiple instances of ANNs, including codes for subsetting EcoSet. 
 
 - **`requirements.txt`**: Lists all the required Python dependencies for the project.
+
+---
+
+## Reproducing the analyses
+
+All commands are run from the `analysis/` directory:
+```bash
+cd analysis
+python3 analyze.py                          # run all four analyses
+python3 analyze.py main control             # run a subset
+python3 analyze.py untrained --recompute    # recompute results from the raw data instead of loading them
+```
+
+The code is self-contained: the raw data and precomputed results are hosted on [OSF](https://osf.io/n6m7b/), and `analyze.py` downloads and extracts only the archives needed for the requested analyses (no manual download is needed). By default, precomputed results are loaded and figures and statistics are regenerated in a few minutes. Figures are saved to `analysis/graphs/<analysis>/`, and all statistics printed during plotting are also saved to `analysis/graphs/<analysis>/stats.txt`.
+
+| Analysis | Paper figures | OSF archives (besides `midb_data`) |
+|---|---|---|
+| `main` | Fig. 1b–5; Supp. Fig. 1–3, 6–11 | `midb_results_standard_mnist`, `midb_results_standard_ecoset10` |
+| `accuracy_control` | Fig. 4a; Supp. Fig. 4 | `midb_results_standard_mnist`, `midb_results_accuracy_control_*` |
+| `control` | Fig. 4b; Supp. Fig. 5 | `midb_results_standard_mnist`, `midb_results_control` |
+| `untrained` | Supp. Fig. 12 | `midb_results_standard_mnist`, `midb_results_untrained` |
+
+`midb_data` contains the trial-level human and ANN data and is always downloaded. With `--recompute`, only `midb_data` is downloaded and all IndiMap results are recomputed from it (1000 bootstrap iterations per model, which takes considerably longer).
+
+**Note on the pseudo-instance control analysis (`control`).** For each architecture, this analysis creates pseudo-instances from each of 60 ANN instances by varying the stimulus noise at test, runs the full IndiMap analysis on each of the 60 pseudo-instance populations, and averages the results across the 60 populations (correlations are averaged in Fisher-z space). Recomputing all 60 populations and merging them takes a very long time, so only the merged results are provided (`IndiMap_results/control/merged/`). The code for the merge is included (`python3 analyze.py control --remerge`), but it requires the per-instance data, which is available upon request.
 
 ---
 
