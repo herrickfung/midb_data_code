@@ -42,7 +42,7 @@ The code requires Python 3.9 and the following packages:
 5. pingouin==0.5.5
 6. seaborn==0.13.2
 7. requests==2.32.5
-8. [indimap](https://github.com/herrickfung/indimap)==0.1.2
+8. [indimap](https://github.com/herrickfung/indimap)==0.1.3
 
 To install these dependencies, 
 ```bash
@@ -97,7 +97,7 @@ Each row includes `midb_data` and `midb_results_standard_mnist`, which are share
 ---
 
 ## Citation
-If you use any materials from this project, please cite the paper(s) below. If you use the data, please also cite the dataset on Harvard Dataverse: [https://doi.org/10.7910/DVN/DVVXJL](https://doi.org/10.7910/DVN/DVVXJL).
+If you use any materials from this project, please cite the paper(s) below:
 
 Fung, H., Murty, N. A. R., & Rahnev, D. (2026). Individual differences in artificial neural networks capture individual differences in human behavior (p. 2026.02.10.705061). bioRxiv. [https://doi.org/10.64898/2026.02.10.705061](https://www.biorxiv.org/content/10.64898/2026.02.10.705061)
 
