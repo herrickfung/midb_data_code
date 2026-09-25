@@ -78,7 +78,7 @@ python3 analyze.py main control             # run a subset
 python3 analyze.py untrained --recompute    # recompute results from the raw data instead of loading them
 ```
 
-The code is self-contained: the raw data and precomputed results are hosted on [Harvard Dataverse](https://doi.org/10.7910/DVN/XXXXXX), and `analyze.py` downloads and extracts only the archives needed for the requested analyses (no manual download is needed). By default, precomputed results are loaded and figures and statistics are regenerated in a few minutes. Figures are saved to `analysis/graphs/<analysis>/`, and all statistics printed during plotting are also saved to `analysis/graphs/<analysis>/stats.txt`.
+The code is self-contained: the raw data and precomputed results are hosted on [Harvard Dataverse](https://doi.org/10.7910/DVN/DVVXJL), and `analyze.py` downloads and extracts only the archives needed for the requested analyses (no manual download is needed). By default, precomputed results are loaded and figures and statistics are regenerated in a few minutes. Figures are saved to `analysis/graphs/<analysis>/`, and all statistics printed during plotting are also saved to `analysis/graphs/<analysis>/stats.txt`.
 
 | Analysis | Paper figures | Data archives (besides `midb_data`) |
 |---|---|---|

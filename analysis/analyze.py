@@ -39,7 +39,7 @@ ANALYSES = ['main', 'accuracy_control', 'control', 'untrained']
 
 # Harvard Dataverse dataset hosting the data archives (<name>.tar.gz)
 DATAVERSE_URL = 'https://dataverse.harvard.edu'
-DATAVERSE_DOI = None  # TODO: fill in after publishing, e.g. 'doi:10.7910/DVN/XXXXXX'
+DATAVERSE_DOI = 'doi:10.7910/DVN/DVVXJL'
 DATAVERSE_VERSION = ':latest-published'
 # Harvard Dataverse rejects requests' default User-Agent with 403
 HTTP_HEADERS = {'User-Agent': 'midb_data_code (https://github.com/herrickfung/midb_data_code)'}
@@ -107,9 +107,6 @@ def ensure_data(analyses, recompute):
     missing = [name for name in needed if not (ROOT / DATA_ARCHIVES[name]).exists()]
     if not missing:
         return
-    if DATAVERSE_DOI is None:
-        sys.exit(f"Missing data archives {missing} and no Dataverse DOI is set; "
-                 f"download them manually and extract them into {ROOT}.")
     file_ids = dataverse_file_ids()
     for name in missing:
         download_and_extract(name, file_ids)
