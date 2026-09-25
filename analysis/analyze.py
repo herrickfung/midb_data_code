@@ -1,8 +1,8 @@
 """ Reproduce all figures and statistics reported in the paper.
 
-By default, the data and precomputed IndiMap results are downloaded from OSF
-(only the archives needed for the requested analyses) and loaded, so figures
-and statistics are regenerated without recomputing anything.
+By default, the data and precomputed IndiMap results are downloaded from
+Harvard Dataverse (only the archives needed for the requested analyses) and
+loaded, so figures and statistics are regenerated without recomputing anything.
 
     python analyze.py                          # all four analyses
     python analyze.py main control             # a subset
@@ -37,29 +37,22 @@ ROOT = pathlib.Path(__file__).parent.absolute()
 GRAPH_ROOT = ROOT / 'graphs'
 ANALYSES = ['main', 'accuracy_control', 'control', 'untrained']
 
-# archive name -> (OSF download url, a file whose presence means the archive is already extracted)
-OSF_ARCHIVES = {
-    'midb_data': (
-        None,  # TODO: fill in after uploading to OSF
-        'dataset/mnist/standard/human.csv'),
-    'midb_results_standard_mnist': (
-        None,
-        'IndiMap_results/standard/mnist_rtnet/CorrMap_results.npz'),
-    'midb_results_standard_ecoset10': (
-        None,
-        'IndiMap_results/standard/ecoset10_rtnet/CorrMap_results.npz'),
-    'midb_results_accuracy_control_rtnet': (
-        None,
-        'IndiMap_results/accuracy_control/mnist_rtnet/2sd/CorrMap_results.npz'),
-    'midb_results_accuracy_control_alexnet_resnet18': (
-        None,
-        'IndiMap_results/accuracy_control/mnist_resnet18/2sd/CorrMap_results.npz'),
-    'midb_results_control': (
-        None,
-        'IndiMap_results/control/merged/mnist_rtnet_merged.npy'),
-    'midb_results_untrained': (
-        None,
-        'IndiMap_results/untrained/mnist_rtnet/CorrMap_results.npz'),
+# Harvard Dataverse dataset hosting the data archives (<name>.tar.gz)
+DATAVERSE_URL = 'https://dataverse.harvard.edu'
+DATAVERSE_DOI = None  # TODO: fill in after publishing, e.g. 'doi:10.7910/DVN/XXXXXX'
+DATAVERSE_VERSION = ':latest-published'
+# Harvard Dataverse rejects requests' default User-Agent with 403
+HTTP_HEADERS = {'User-Agent': 'midb_data_code (https://github.com/herrickfung/midb_data_code)'}
+
+# archive name -> a file whose presence means the archive is already extracted
+DATA_ARCHIVES = {
+    'midb_data': 'dataset/mnist/standard/human.csv',
+    'midb_results_standard_mnist': 'IndiMap_results/standard/mnist_rtnet/CorrMap_results.npz',
+    'midb_results_standard_ecoset10': 'IndiMap_results/standard/ecoset10_rtnet/CorrMap_results.npz',
+    'midb_results_accuracy_control_rtnet': 'IndiMap_results/accuracy_control/mnist_rtnet/2sd/CorrMap_results.npz',
+    'midb_results_accuracy_control_alexnet_resnet18': 'IndiMap_results/accuracy_control/mnist_resnet18/2sd/CorrMap_results.npz',
+    'midb_results_control': 'IndiMap_results/control/merged/mnist_rtnet_merged.npy',
+    'midb_results_untrained': 'IndiMap_results/untrained/mnist_rtnet/CorrMap_results.npz',
 }
 
 # precomputed-result archives needed by each analysis (on top of midb_data)
@@ -80,17 +73,20 @@ STANDARD_GETTERS = {
 # ---------------------------------------------------------------------------
 # data download
 # ---------------------------------------------------------------------------
-def download_and_extract(name):
-    url, check_file = OSF_ARCHIVES[name]
-    if (ROOT / check_file).exists():
-        return
-    if url is None:
-        sys.exit(f"Archive '{name}' is missing and no download URL is set; "
-                 f"download it from OSF and extract it into {ROOT}.")
+def dataverse_file_ids():
+    """ Map each file name in the Dataverse dataset to its file id. """
+    response = requests.get(
+        f'{DATAVERSE_URL}/api/datasets/:persistentId/versions/{DATAVERSE_VERSION}/files',
+        params={'persistentId': DATAVERSE_DOI}, headers=HTTP_HEADERS)
+    response.raise_for_status()
+    return {f['dataFile']['filename']: f['dataFile']['id'] for f in response.json()['data']}
 
+
+def download_and_extract(name, file_ids):
     tar_path = ROOT / f'{name}.tar.gz'
-    print(f"Downloading {name} from OSF, please wait ...")
-    with requests.get(url, stream=True) as response:
+    print(f"Downloading {name} from Harvard Dataverse, please wait ...")
+    url = f'{DATAVERSE_URL}/api/access/datafile/{file_ids[tar_path.name]}'
+    with requests.get(url, headers=HTTP_HEADERS, stream=True) as response:
         response.raise_for_status()
         with open(tar_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=1 << 20):
@@ -108,8 +104,15 @@ def ensure_data(analyses, recompute):
     if not recompute:
         for analysis in analyses:
             needed += [a for a in RESULT_ARCHIVES[analysis] if a not in needed]
-    for name in needed:
-        download_and_extract(name)
+    missing = [name for name in needed if not (ROOT / DATA_ARCHIVES[name]).exists()]
+    if not missing:
+        return
+    if DATAVERSE_DOI is None:
+        sys.exit(f"Missing data archives {missing} and no Dataverse DOI is set; "
+                 f"download them manually and extract them into {ROOT}.")
+    file_ids = dataverse_file_ids()
+    for name in missing:
+        download_and_extract(name, file_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +292,7 @@ def run_control(args, path):
     if args.remerge:
         if not (ROOT / 'dataset' / 'mnist' / 'control').exists():
             sys.exit("--remerge needs the per-instance control data in dataset/mnist/control/, "
-                     "which is not distributed on OSF (see README).")
+                     "which is not distributed with the data archives (see README).")
         CONTROL_MERGED_PATH.mkdir(parents=True, exist_ok=True)
         for combo_name, getter in CONTROL_GETTERS.items():
             print(f'Merging {combo_name} ({N_CONTROL_INSTANCES} instances) ...')
