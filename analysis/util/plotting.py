@@ -2080,7 +2080,7 @@ def plot_corr_within_metric_consistency_control(standard_data, merged_control, n
 
     standard_data: [rtnet, alexnet, resnet18] IndiMap objects (variant='standard').
     merged_control: [rtnet, alexnet, resnet18] merged-result dicts produced by
-    analyze_control.py's merge_combo (already r2z-averaged over the 60 control
+    analyze.py's merge_control (already r2z-averaged over the 60 control
     instances, n_boots dimension intact). Boxes show the control distribution;
     a star overlays the single standard-model reference (Human-Human is skipped
     since it does not depend on which model's control instances were used).
