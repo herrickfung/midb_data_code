@@ -1701,8 +1701,22 @@ def plot_within_metric_prediction_raw(data, name, path):
     return plot_data
 
 
+def _annotate_diff_vs_zero(ax, x, y, z_diff, label):
+    """ One-sample t-test of a (Fisher-z) difference against 0, with stars just below y. """
+    vals = z_diff[~np.isnan(z_diff)]
+    if len(vals) == 0:
+        return
+    t_stat, p_val = stats.ttest_1samp(vals, 0)
+    print(f"{label} vs 0 - t-value: {t_stat:.4f}, p-value: {p_val}")
+    anno, alpha = _stars_for_pval(p_val)
+    ax.annotate(anno, (x, y), textcoords="offset points", xytext=(0, -2), ha='center', va='top',
+                size=8, alpha=alpha, fontweight='bold')
+
+
 def plot_within_metric_prediction_diff(data, name, path):
     plot_data = np.diff(data, axis = 0).squeeze()
+    z_diff = np.diff(stat_func.r2z(data, metric='pearson'), axis = 0).squeeze()
+    z_diff[np.isnan(plot_data)] = np.nan  # r2z turns missing (NaN) maps into non-NaN values
     n_maps, n_metrics, n_subjs = plot_data.shape
 
     if name == 'mnist':
@@ -1711,6 +1725,7 @@ def plot_within_metric_prediction_diff(data, name, path):
         titles = ['Accuracy', 'Confidence', 'RT']
         model_label = ['Subject', 'RTNet', 'AlexNet', 'ResNet18']
 
+        whisker_low = np.full(n_metrics, np.inf)
         for map_ in range(n_maps):
             for met in range(n_metrics):
                 x_pos = met * 5 + map_ * 0.8
@@ -1718,6 +1733,12 @@ def plot_within_metric_prediction_diff(data, name, path):
                             showfliers=False,
                             )
                 _style_boxplot(box, colors(map_))
+                whisker_low[met] = np.nanmin([whisker_low[met], *[w.get_ydata().min() for w in box['whiskers']]])
+
+        for met in range(n_metrics):
+            for map_ in range(n_maps):
+                _annotate_diff_vs_zero(plt.gca(), met * 5 + map_ * 0.8, np.nanmin(whisker_low),
+                                       z_diff[map_, met, :], f"Metric: {titles[met]}, Map: {model_label[map_]}")
 
         for met in range(n_metrics):
             sub_data = plot_data[:, met, :]
@@ -1747,6 +1768,7 @@ def plot_within_metric_prediction_diff(data, name, path):
         plt.xlim(-1, 15.5)
         plt.gca().spines['top'].set_visible(False)
         plt.gca().spines['right'].set_visible(False)
+        _fit_lim_to_text(axis='y', pad=0.002)
 
         plt.tight_layout()
         _save_pdf(path / f'pred_wn_var_diff_{name}.pdf')
@@ -1757,6 +1779,7 @@ def plot_within_metric_prediction_diff(data, name, path):
         titles = ['Accuracy', 'Confidence', 'RT']
         model_label = ['Subject', 'RTNet', 'AlexNet', 'ResNet18']
 
+        whisker_low = np.full(n_metrics, np.inf)
         for map_ in range(n_maps):
             for met in range(n_metrics):
                 x_pos = map_ * 0.8
@@ -1764,6 +1787,12 @@ def plot_within_metric_prediction_diff(data, name, path):
                             showfliers=False,
                             )
                 _style_boxplot(box, colors(map_))
+                whisker_low[met] = np.nanmin([whisker_low[met], *[w.get_ydata().min() for w in box['whiskers']]])
+
+        for met in range(n_metrics):
+            for map_ in range(n_maps):
+                _annotate_diff_vs_zero(ax[met], map_ * 0.8, whisker_low[met],
+                                       z_diff[map_, met, :], f"Metric: {titles[met]}, Map: {model_label[map_]}")
 
         for met in range(n_metrics):
             sub_data = plot_data[:, met, :]
@@ -1794,6 +1823,7 @@ def plot_within_metric_prediction_diff(data, name, path):
                 else:
                     ax[met].set_xticks([0, 0.8], model_label[:2], fontsize=6)
                     ax[met].set_xlim(-0.8, 3.2)
+            _fit_lim_to_text(ax[met], axis='y', pad=0.0005)
 
         plt.tight_layout()
         _save_pdf(path / f'pred_wn_var_diff_{name}.pdf')

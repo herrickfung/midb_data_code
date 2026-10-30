@@ -1,7 +1,7 @@
 """ Reproduce all figures and statistics reported in the paper.
 
 By default, the data and precomputed IndiMap results are downloaded from
-Harvard Dataverse (only the archives needed for the requested analyses) and
+Zenodo (only the archives needed for the requested analyses) and
 loaded, so figures and statistics are regenerated without recomputing anything.
 
     python analyze.py                          # all four analyses
@@ -37,12 +37,9 @@ ROOT = pathlib.Path(__file__).parent.absolute()
 GRAPH_ROOT = ROOT / 'graphs'
 ANALYSES = ['main', 'accuracy_control', 'control', 'untrained']
 
-# Harvard Dataverse dataset hosting the data archives (<name>.tar.gz)
-DATAVERSE_URL = 'https://dataverse.harvard.edu'
-DATAVERSE_DOI = 'doi:10.7910/DVN/DVVXJL'
-DATAVERSE_VERSION = ':latest-published'
-# Harvard Dataverse rejects requests' default User-Agent with 403
-HTTP_HEADERS = {'User-Agent': 'midb_data_code (https://github.com/herrickfung/midb_data_code)'}
+# Zenodo record hosting the data archives (<name>.tar.gz)
+ZENODO_RECORD = '23768325'
+ZENODO_URL = f'https://zenodo.org/records/{ZENODO_RECORD}/files'
 
 # archive name -> a file whose presence means the archive is already extracted
 DATA_ARCHIVES = {
@@ -73,20 +70,10 @@ STANDARD_GETTERS = {
 # ---------------------------------------------------------------------------
 # data download
 # ---------------------------------------------------------------------------
-def dataverse_file_ids():
-    """ Map each file name in the Dataverse dataset to its file id. """
-    response = requests.get(
-        f'{DATAVERSE_URL}/api/datasets/:persistentId/versions/{DATAVERSE_VERSION}/files',
-        params={'persistentId': DATAVERSE_DOI}, headers=HTTP_HEADERS)
-    response.raise_for_status()
-    return {f['dataFile']['filename']: f['dataFile']['id'] for f in response.json()['data']}
-
-
-def download_and_extract(name, file_ids):
+def download_and_extract(name):
     tar_path = ROOT / f'{name}.tar.gz'
-    print(f"Downloading {name} from Harvard Dataverse, please wait ...")
-    url = f'{DATAVERSE_URL}/api/access/datafile/{file_ids[tar_path.name]}'
-    with requests.get(url, headers=HTTP_HEADERS, stream=True) as response:
+    print(f"Downloading {name} from Zenodo, please wait ...")
+    with requests.get(f'{ZENODO_URL}/{tar_path.name}?download=1', stream=True) as response:
         response.raise_for_status()
         with open(tar_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=1 << 20):
@@ -107,9 +94,8 @@ def ensure_data(analyses, recompute):
     missing = [name for name in needed if not (ROOT / DATA_ARCHIVES[name]).exists()]
     if not missing:
         return
-    file_ids = dataverse_file_ids()
     for name in missing:
-        download_and_extract(name, file_ids)
+        download_and_extract(name)
 
 
 # ---------------------------------------------------------------------------
